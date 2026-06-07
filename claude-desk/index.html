@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>claude-desk — A native Mac front-end for the Claude CLI</title>
+  <meta name="description" content="A SwiftUI macOS app that wraps the Claude CLI with per-project sessions, multi-pane chat, image paste, and MCP permission prompts in a real dialog instead of a TTY line.">
+  <meta property="og:title" content="claude-desk — A native Mac front-end for the Claude CLI">
+  <meta property="og:description" content="Per-project sessions, multi-pane chat, image paste, MCP permission dialogs.">
+  <meta property="og:url" content="https://liucxer.github.io/claude-desk/">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-brand"><a href="./">claude-desk</a></div>
+  <nav class="site-nav">
+    <a href="./" class="active">About</a>
+    <a href="support.html">Support</a>
+    <a href="privacy.html">Privacy</a>
+  </nav>
+</header>
+
+<main>
+
+  <div class="hero">
+    <h1>claude-desk</h1>
+    <div class="accent"></div>
+    <div class="tagline">A native Mac front-end for the Claude CLI.</div>
+  </div>
+
+  <section>
+    <p>If you already run <code>claude</code> in the terminal, <strong>claude-desk</strong> puts a real Mac window around it — per-project sessions, multi-pane chat, MCP permission prompts in a proper dialog instead of a TTY line, image paste, and rendered markdown.</p>
+    <p>Local-only. Sessions are saved on your Mac. The only network call the app makes is the one the Claude CLI was going to make anyway, on your behalf.</p>
+  </section>
+
+  <section>
+    <h2>What it does</h2>
+    <div class="accent"></div>
+
+    <div class="feature">
+      <div class="feature-icon">📁</div>
+      <div class="feature-text">
+        <strong>Per-project sessions</strong>
+        <span>Each project is a directory on your Mac. Switch between them in the sidebar; each carries its own conversation history. New projects land in <code>~/claude-desk/Projects/</code>, but you can attach any existing directory.</span>
+      </div>
+    </div>
+
+    <div class="feature">
+      <div class="feature-icon">🗂</div>
+      <div class="feature-text">
+        <strong>Multi-pane chat</strong>
+        <span>Cmd-click a second project in the sidebar to open them side-by-side. Drag the divider to rebalance; the split persists across launches.</span>
+      </div>
+    </div>
+
+    <div class="feature">
+      <div class="feature-icon">🔐</div>
+      <div class="feature-text">
+        <strong>MCP permission prompts as dialogs</strong>
+        <span>Instead of typing y/n into a terminal, MCP tool calls pop a real macOS confirmation dialog. Tool arguments are formatted readably, not splatted as raw JSON.</span>
+      </div>
+    </div>
+
+    <div class="feature">
+      <div class="feature-icon">📷</div>
+      <div class="feature-text">
+        <strong>Paste screenshots into the chat</strong>
+        <span>Cmd-Shift-4, then Cmd-V into the input. The image attaches inline and is sent on submit. No file picker round-trip.</span>
+      </div>
+    </div>
+
+    <div class="feature">
+      <div class="feature-icon">📜</div>
+      <div class="feature-text">
+        <strong>Rendered markdown, streaming output</strong>
+        <span>Code blocks, lists, and tables render as you'd expect. Tokens stream in as Claude writes, so you can stop a generation early or read along.</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>How it works</h2>
+    <div class="accent"></div>
+    <p>claude-desk doesn't talk to Anthropic directly. It shells out to the <a href="https://docs.claude.com/en/docs/claude-code">Claude CLI</a> binary you already have installed and renders the JSON stream into a chat UI. Your existing Claude CLI authentication (Anthropic API key or claude.ai session) is what authenticates each request — claude-desk never sees your credentials.</p>
+    <p>Practical upshot: any feature, model, or MCP server that the CLI supports works in claude-desk automatically. It also means you need the CLI installed. Follow the install steps at <a href="https://docs.claude.com/en/docs/claude-code">docs.claude.com</a>.</p>
+  </section>
+
+  <section>
+    <h2>What it doesn't do</h2>
+    <div class="accent"></div>
+    <ul>
+      <li><strong>No bundled CLI.</strong> Bring your own <code>claude</code> binary. We don't want to be on the upgrade path between you and Anthropic's releases.</li>
+      <li><strong>No subscription, no telemetry, no account.</strong> The app itself doesn't talk to any server the developer operates.</li>
+      <li><strong>No cloud sync.</strong> Sessions live in <code>~/Library/Application Support/claude-desk/</code>. Back them up however you back up the rest of your Mac.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Requirements</h2>
+    <div class="accent"></div>
+    <ul>
+      <li>macOS Ventura 13.0 or later (Apple Silicon or Intel)</li>
+      <li>The <code>claude</code> CLI installed and authenticated</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Download</h2>
+    <div class="accent"></div>
+    <p><em>Early development. A signed direct-download build will be linked here when one is ready.</em></p>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  &copy; 2026 Changxi Liu &middot; <a href="support.html">Support</a> &middot; <a href="privacy.html">Privacy</a> &middot; <a href="mailto:liucxer@gmail.com">Contact</a>
+</footer>
+
+</body>
+</html>

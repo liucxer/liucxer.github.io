@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Support — claude-desk</title>
+  <meta name="description" content="FAQ, troubleshooting, and bug reporting for claude-desk.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-brand"><a href="./">claude-desk</a></div>
+  <nav class="site-nav">
+    <a href="./">About</a>
+    <a href="support.html" class="active">Support</a>
+    <a href="privacy.html">Privacy</a>
+  </nav>
+</header>
+
+<main>
+
+  <section>
+    <h2>Support</h2>
+    <div class="accent"></div>
+    <p>For bugs, feature requests, or general questions, email <a href="mailto:liucxer@gmail.com">liucxer@gmail.com</a>. I read everything and reply within a few days.</p>
+  </section>
+
+  <section>
+    <h2>Frequently asked questions</h2>
+    <div class="accent"></div>
+
+    <h3>I get "claude: command not found" when I send a message.</h3>
+    <p>claude-desk shells out to the <code>claude</code> CLI binary. Install it first — follow the steps at <a href="https://docs.claude.com/en/docs/claude-code">docs.claude.com</a>, then run <code>claude --version</code> in Terminal to confirm. If it works in Terminal but not in claude-desk, the app may not see your shell <code>PATH</code>; quitting and relaunching usually fixes it.</p>
+
+    <h3>Where are my sessions stored?</h3>
+    <p>On your Mac, in <code>~/Library/Application Support/claude-desk/</code>. Each project has its own <code>.jsonl</code> transcript file under <code>sessions/</code>. They're plain text — feel free to back them up, grep them, or delete them.</p>
+
+    <h3>Where do new projects get created?</h3>
+    <p>By default, under <code>~/claude-desk/Projects/</code>. The <strong>New Project…</strong> command (Cmd-N) creates a fresh directory there. <strong>Open Project…</strong> (Cmd-O) lets you attach any existing directory on your Mac as a project — useful for hooking claude-desk into an existing repo.</p>
+
+    <h3>How do I open two projects side-by-side?</h3>
+    <p>Cmd-click a second project in the sidebar. Both panes load. Drag the divider between them to resize; the split width persists across launches per pair.</p>
+
+    <h3>The CLI is asking me to confirm a tool call but no dialog appeared.</h3>
+    <p>The dialog window is brought to the foreground via <code>NSApp.activate</code>, which sometimes gets suppressed if the app isn't the active app. Click the claude-desk dock icon to bring it forward, and the dialog should appear. If it still doesn't, email me with the model and CLI versions.</p>
+
+    <h3>Can I paste screenshots into the input?</h3>
+    <p>Yes. Take a screenshot (Cmd-Shift-4 → area, or Cmd-Shift-3 → fullscreen), then click into the chat input and Cmd-V. The image attaches inline and gets sent on submit. You can also paste images that you've copied from another app.</p>
+
+    <h3>Does this work without an internet connection?</h3>
+    <p>The app itself runs offline — you can open it, browse past sessions, and edit settings. But <em>sending a message</em> calls the Claude CLI, which needs network access to reach Anthropic.</p>
+
+    <h3>Does this run on macOS 12 (Monterey) or earlier?</h3>
+    <p>No. claude-desk requires macOS Ventura 13.0 or later.</p>
+
+    <h3>Is the source code open?</h3>
+    <p>Not currently. May open-source later — drop me an email if that matters to you.</p>
+  </section>
+
+  <section>
+    <h2>Reporting a bug</h2>
+    <div class="accent"></div>
+    <p>Email <strong>liucxer@gmail.com</strong> with:</p>
+    <ol>
+      <li><strong>What you did</strong> (one or two sentences)</li>
+      <li><strong>What you expected to happen</strong></li>
+      <li><strong>What actually happened</strong></li>
+      <li><strong>macOS version</strong> (Apple menu → About This Mac)</li>
+      <li><strong>claude-desk version</strong></li>
+      <li><strong><code>claude --version</code> output</strong></li>
+      <li>(Optional) A screenshot or the relevant lines from the session transcript at <code>~/Library/Application Support/claude-desk/sessions/&lt;project-id&gt;.jsonl</code></li>
+    </ol>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  &copy; 2026 Changxi Liu &middot; <a href="./">About</a> &middot; <a href="privacy.html">Privacy</a> &middot; <a href="mailto:liucxer@gmail.com">Contact</a>
+</footer>
+
+</body>
+</html>

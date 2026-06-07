@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacy Policy — claude-desk</title>
+  <meta name="description" content="Privacy policy for claude-desk. The app stores everything locally and makes no network calls of its own.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-brand"><a href="./">claude-desk</a></div>
+  <nav class="site-nav">
+    <a href="./">About</a>
+    <a href="support.html">Support</a>
+    <a href="privacy.html" class="active">Privacy</a>
+  </nav>
+</header>
+
+<main>
+
+  <section>
+    <h2>Privacy Policy</h2>
+    <div class="accent"></div>
+    <p class="muted"><em>Last updated: 2026-06-07</em></p>
+    <p><strong>claude-desk itself collects nothing and makes no network requests of its own.</strong> It is a local Mac app that spawns the <code>claude</code> CLI you already have installed and renders its output.</p>
+  </section>
+
+  <section>
+    <h2>What stays on your Mac</h2>
+    <div class="accent"></div>
+    <ul>
+      <li>Project list, pane layout, and UI preferences — stored in standard <code>NSUserDefaults</code> for the app.</li>
+      <li>Per-project session transcripts (every message, every tool call, every response) — stored as <code>.jsonl</code> files in <code>~/Library/Application Support/claude-desk/sessions/</code>.</li>
+      <li>Pasted images and other attachments — stored in <code>~/Library/Application Support/claude-desk/attachments/</code>.</li>
+    </ul>
+    <p>None of this is ever uploaded by claude-desk. You can inspect, edit, copy, or delete any of it with Finder.</p>
+  </section>
+
+  <section>
+    <h2>What leaves your Mac (via the Claude CLI)</h2>
+    <div class="accent"></div>
+    <p>When you send a message, claude-desk hands it to the <code>claude</code> CLI as a subprocess. The CLI then makes an HTTPS request to Anthropic's API on your behalf, using <em>your</em> Anthropic API key (or your claude.ai session). The prompt, the relevant conversation history, attached files, and tool-call results travel to Anthropic. claude-desk never sees or stores your API credentials — that's the CLI's job.</p>
+    <p>How Anthropic handles that data is governed by <a href="https://www.anthropic.com/legal/privacy">Anthropic's Privacy Policy</a> and the terms of the API plan or claude.ai account you're authenticated under. claude-desk has no influence over that path — it only assembles and renders what the CLI processes.</p>
+  </section>
+
+  <section>
+    <h2>MCP servers you configure</h2>
+    <div class="accent"></div>
+    <p>If you've configured MCP servers (in the Claude CLI's own config), claude-desk relays JSON-RPC over a UNIX socket to a small bundled shell script. The script's only job is to forward each line back to the app so we can show the permission dialog. The script runs locally; no data goes off-device through this path. Whether the MCP server <em>itself</em> sends data off-device depends on the server — those are configured by you, not by claude-desk.</p>
+  </section>
+
+  <section>
+    <h2>Analytics, ads, third-party SDKs</h2>
+    <div class="accent"></div>
+    <ul>
+      <li>No analytics framework is linked into the app (no Sentry, Mixpanel, Crashlytics, Firebase, etc.).</li>
+      <li>No advertising framework.</li>
+      <li>No third-party SDK of any kind.</li>
+      <li>No background uploads, crash reports, or update pings to anything operated by the developer.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Code signing and Gatekeeper</h2>
+    <div class="accent"></div>
+    <p>The app is signed with the developer's Apple Developer ID so Gatekeeper accepts it. The signature does not give the developer visibility into who is running the app.</p>
+  </section>
+
+  <section>
+    <h2>Changes to this policy</h2>
+    <div class="accent"></div>
+    <p>If we ever change what the app does with your data, this page will be updated and the "Last updated" date at the top will reflect that. Material changes will also be noted in the app's release notes.</p>
+  </section>
+
+  <section>
+    <h2>Contact</h2>
+    <div class="accent"></div>
+    <p>For questions about this policy, email <a href="mailto:liucxer@gmail.com">liucxer@gmail.com</a>.</p>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  &copy; 2026 Changxi Liu &middot; <a href="./">About</a> &middot; <a href="support.html">Support</a> &middot; <a href="mailto:liucxer@gmail.com">Contact</a>
+</footer>
+
+</body>
+</html>
