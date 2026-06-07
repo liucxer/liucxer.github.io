@@ -1,9 +1,9 @@
 :root {
-  --bg: #0E1116;
-  --primary: #F4EDE0;
-  --secondary: #7B8088;
-  --accent: #F4B942;
-  --stroke: #2A2F38;
+  --bg: #FBF7EE;
+  --primary: #2A2418;
+  --secondary: #8A8275;
+  --accent: #C9932E;
+  --stroke: #E8E1CF;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -119,7 +119,7 @@ li { margin-bottom: 6px; font-weight: 300; }
 a {
   color: var(--accent);
   text-decoration: none;
-  border-bottom: 1px solid rgba(244, 185, 66, 0.3);
+  border-bottom: 1px solid rgba(201, 147, 46, 0.45);
 }
 a:hover { border-bottom-color: var(--accent); }
 
@@ -128,7 +128,7 @@ strong { font-weight: 500; color: var(--primary); }
 code {
   font-family: "SF Mono", ui-monospace, Menlo, monospace;
   font-size: 14px;
-  background: rgba(255,255,255,0.06);
+  background: rgba(42, 36, 24, 0.06);
   padding: 1px 6px;
   border-radius: 4px;
 }
