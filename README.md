@@ -26,8 +26,8 @@ Each app is a **self-contained subdirectory** — its own pages, its own `style.
 |---|---|---|---|
 | **4,680 Weeks** | https://liucxer.github.io/4680-weeks/ | macOS · English | In App Store review |
 | **claude-desk** | https://liucxer.github.io/claude-desk/ | macOS · English | Early development |
-| **小豆丁学堂** | https://liucxer.github.io/learning-flashcards/ | iOS · 中文 | TestFlight,即将上架 |
-| **小豆丁推理课** | https://liucxer.github.io/dingding-logic/ | iOS · 中文 | TestFlight,即将上架 |
+| **小豆丁学堂** | https://liucxer.github.io/learning-flashcards/ | iOS · 中文 | 免费 · [App Store](https://apps.apple.com/cn/app/小豆丁学堂/id6762811519) |
+| **小豆丁逻辑课** | https://liucxer.github.io/dingding-logic/ | iOS · 中文 | 免费 · [App Store](https://apps.apple.com/cn/app/小豆丁-逻辑课/id6775833119) |
 
 ## App Store Connect URL fields → repo paths
 
