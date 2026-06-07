@@ -1,0 +1,202 @@
+:root {
+  --bg: #0E1116;
+  --primary: #F4EDE0;
+  --secondary: #7B8088;
+  --accent: #F4B942;
+  --stroke: #2A2F38;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background: var(--bg);
+  color: var(--primary);
+  padding: 48px 24px;
+}
+
+main { max-width: 720px; margin: 0 auto; }
+
+/* Header / nav */
+.site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 720px;
+  margin: 0 auto 48px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.site-brand a {
+  font-size: 20px;
+  font-weight: 300;
+  color: var(--primary);
+  text-decoration: none;
+  border-bottom: none;
+  letter-spacing: -0.01em;
+}
+
+.site-nav {
+  display: flex;
+  gap: 24px;
+  font-size: 13px;
+}
+
+.site-nav a {
+  color: var(--secondary);
+  text-decoration: none;
+  border-bottom: none;
+}
+
+.site-nav a:hover,
+.site-nav a.active {
+  color: var(--accent);
+}
+
+/* Hero (marketing page) */
+.hero {
+  text-align: center;
+  margin-bottom: 64px;
+}
+
+.hero h1 {
+  font-size: 56px;
+  font-weight: 200;
+  letter-spacing: -0.02em;
+  margin-bottom: 12px;
+}
+
+.accent {
+  display: inline-block;
+  width: 32px;
+  height: 2px;
+  background: var(--accent);
+  margin: 8px 0 18px;
+}
+
+.tagline {
+  font-size: 20px;
+  color: var(--secondary);
+  font-weight: 300;
+}
+
+/* Sections */
+section { margin-bottom: 48px; }
+
+h2 {
+  font-size: 24px;
+  font-weight: 300;
+  margin-bottom: 8px;
+}
+
+h2 + .accent { margin-bottom: 18px; }
+
+h3 {
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--primary);
+  margin-top: 24px;
+  margin-bottom: 6px;
+}
+
+p {
+  margin-bottom: 14px;
+  color: var(--primary);
+  font-weight: 300;
+}
+
+p.muted, p em { color: var(--secondary); font-style: normal; }
+p em { font-style: italic; }
+
+ul, ol { padding-left: 22px; margin-bottom: 14px; }
+li { margin-bottom: 6px; font-weight: 300; }
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(244, 185, 66, 0.3);
+}
+a:hover { border-bottom-color: var(--accent); }
+
+strong { font-weight: 500; color: var(--primary); }
+
+code {
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 14px;
+  background: rgba(255,255,255,0.06);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+/* Feature block (marketing) */
+.feature {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 20px;
+  align-items: flex-start;
+}
+.feature-icon {
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+  color: var(--accent);
+}
+.feature-text strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--primary);
+  font-weight: 500;
+}
+.feature-text span {
+  color: var(--secondary);
+  font-weight: 300;
+  font-size: 14px;
+}
+
+/* Price card */
+.price-card {
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  padding: 32px 24px;
+  text-align: center;
+  margin: 32px 0 16px;
+}
+.price-card .amount {
+  font-size: 44px;
+  font-weight: 200;
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.price-card .label {
+  color: var(--secondary);
+  font-size: 13px;
+}
+
+/* Footer */
+.site-footer {
+  max-width: 720px;
+  margin: 80px auto 0;
+  padding-top: 24px;
+  border-top: 1px solid var(--stroke);
+  color: var(--secondary);
+  font-size: 13px;
+  text-align: center;
+}
+.site-footer a { color: var(--secondary); border-bottom-color: transparent; }
+.site-footer a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* Mobile */
+@media (max-width: 600px) {
+  body { padding: 32px 16px; }
+  .hero h1 { font-size: 40px; }
+  .tagline { font-size: 16px; }
+  .site-header { flex-direction: column; text-align: center; }
+  .site-nav { justify-content: center; }
+}

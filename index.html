@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Changxi Liu — Indie Mac apps</title>
+  <meta name="description" content="A small portfolio of paid indie Mac apps by Changxi Liu. Pay once. No subscription. No tracking.">
+  <meta property="og:title" content="Changxi Liu — Indie Mac apps">
+  <meta property="og:description" content="A small portfolio of paid indie Mac apps. Pay once. No subscription. No tracking.">
+  <meta property="og:url" content="https://liucxer.github.io/">
+  <style>
+    :root {
+      --bg: #0E1116;
+      --primary: #F4EDE0;
+      --secondary: #7B8088;
+      --accent: #F4B942;
+      --stroke: #2A2F38;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html {
+      font: 16px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    body {
+      background: var(--bg);
+      color: var(--primary);
+      padding: 64px 24px;
+    }
+    main { max-width: 640px; margin: 0 auto; }
+
+    header { margin-bottom: 56px; }
+    h1 {
+      font-size: 44px;
+      font-weight: 200;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+    }
+    .accent {
+      display: inline-block;
+      width: 32px;
+      height: 2px;
+      background: var(--accent);
+      margin: 8px 0 18px;
+    }
+    .tagline {
+      font-size: 16px;
+      color: var(--secondary);
+      font-weight: 300;
+    }
+
+    .apps { margin-bottom: 64px; }
+    .app {
+      padding: 28px 0;
+      border-bottom: 1px solid var(--stroke);
+    }
+    .app:last-child { border-bottom: none; }
+
+    .app h2 {
+      font-size: 24px;
+      font-weight: 300;
+      margin-bottom: 6px;
+    }
+    .app h2 a {
+      color: var(--primary);
+      text-decoration: none;
+      border-bottom: none;
+    }
+    .app h2 a:hover { color: var(--accent); }
+
+    .app p {
+      color: var(--secondary);
+      font-weight: 300;
+      margin-bottom: 8px;
+    }
+    .app .meta {
+      font-size: 12px;
+      color: var(--secondary);
+      opacity: 0.7;
+      font-family: "SF Mono", ui-monospace, Menlo, monospace;
+    }
+
+    .app.placeholder h2 {
+      color: var(--secondary);
+      font-style: italic;
+    }
+    .app.placeholder p {
+      font-size: 14px;
+      opacity: 0.6;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+      border-bottom: 1px solid rgba(244, 185, 66, 0.3);
+    }
+    a:hover { border-bottom-color: var(--accent); }
+
+    footer {
+      padding-top: 24px;
+      border-top: 1px solid var(--stroke);
+      color: var(--secondary);
+      font-size: 13px;
+      text-align: center;
+    }
+    footer a {
+      color: var(--secondary);
+      border-bottom: none;
+    }
+    footer a:hover { color: var(--accent); border-bottom: 1px solid var(--accent); }
+
+    @media (max-width: 600px) {
+      body { padding: 40px 16px; }
+      h1 { font-size: 32px; }
+      .app h2 { font-size: 20px; }
+    }
+  </style>
+</head>
+<body>
+<main>
+
+  <header>
+    <h1>Changxi Liu</h1>
+    <div class="accent"></div>
+    <p class="tagline">Indie macOS apps. Pay once. No subscription. No tracking.</p>
+  </header>
+
+  <section class="apps">
+
+    <article class="app">
+      <h2><a href="/4680-weeks/">4,680 Weeks</a></h2>
+      <p>A calendar for the rest of your life. See your 90 years as 4,680 weekly squares, right in your Mac menu bar.</p>
+      <p class="meta">macOS Sonoma+ · $4.99 · Mac App Store (coming soon)</p>
+    </article>
+
+    <article class="app placeholder">
+      <h2>More apps coming…</h2>
+      <p>Currently building app #2.</p>
+    </article>
+
+  </section>
+
+  <footer>
+    <p>
+      Contact: <a href="mailto:liucxer@gmail.com">liucxer@gmail.com</a>
+      &nbsp;·&nbsp;
+      GitHub: <a href="https://github.com/liucxer">@liucxer</a>
+    </p>
+  </footer>
+
+</main>
+</body>
+</html>
