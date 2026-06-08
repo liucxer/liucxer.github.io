@@ -318,11 +318,11 @@
 <div class="header">
   <h1>营养计算器</h1>
   <div class="mode-switch" id="modeSwitch">
-    <button class="active" data-mode="bulk">增肌</button>
-    <button data-mode="cut">减脂</button>
+    <button data-mode="bulk">增肌</button>
+    <button class="active" data-mode="cut">减脂</button>
   </div>
   <div class="weight-input">
-    <input type="number" id="weight" value="65" min="30" max="200" inputmode="decimal">
+    <input type="number" id="weight" value="66" min="30" max="200" inputmode="decimal">
     <span>kg</span>
   </div>
 </div>
@@ -404,8 +404,13 @@
     m.items.forEach(k => counts[m.id][k] = 0);
   });
 
+  // Personal defaults: 减脂, 66kg, 早 (4 蛋白+1 豆浆+1 馒头) / 午 (200g 鸡胸+2 米饭+1 蔬菜) / 晚 (200g 鸡胸+1 米饭+1 蔬菜)
+  Object.assign(counts.breakfast, { eggWhite: 4, soymilk: 1, mantou: 1 });
+  Object.assign(counts.lunch,     { chicken:  2, rice:    2, veggie: 1 });
+  Object.assign(counts.dinner,    { chicken:  2, rice:    1, veggie: 1 });
+
   let activeMeal = MEALS[0].id;
-  let mode = 'bulk';
+  let mode = 'cut';
   const pickerOpen = {}; // per meal
   MEALS.forEach(m => pickerOpen[m.id] = false);
 
@@ -503,6 +508,7 @@
     });
   }
   renderFoods();
+  renderTabDots();
 
   // Mode switch
   $('modeSwitch').addEventListener('click', e => {
