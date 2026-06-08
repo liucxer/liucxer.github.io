@@ -96,43 +96,44 @@
   .weight-input input:focus { outline: none; }
   .weight-input .sep { padding: 0 2px; opacity: .5; }
 
-  /* Tabs */
-  .tabs {
+  /* Meal sections */
+  .meal-section {
+    padding: 8px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .meal-section:first-child { padding-top: 0; }
+  .meal-section:last-child  { border-bottom: 0; padding-bottom: 0; }
+  .meal-head {
     display: flex;
-    background: var(--card);
-    border-radius: 10px;
-    padding: 3px;
-    box-shadow: 0 1px 2px rgba(0,0,0,.05);
-    flex-shrink: 0;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
   }
-  .tabs button {
-    flex: 1;
-    border: 0;
-    background: transparent;
-    padding: 8px 4px;
+  .meal-title {
     font-size: 13px;
-    font-weight: 600;
-    color: var(--muted);
-    border-radius: 8px;
-    position: relative;
+    font-weight: 700;
+    color: var(--ink);
   }
-  .tabs button.active {
-    background: var(--ink);
-    color: #fff;
-  }
-  .tabs button .dot {
+  .meal-badge {
     display: inline-block;
-    min-width: 16px;
-    height: 16px;
-    line-height: 16px;
-    border-radius: 8px;
+    min-width: 18px;
+    height: 18px;
+    line-height: 18px;
+    border-radius: 9px;
     background: var(--accent);
     color: #fff;
     font-size: 10px;
-    margin-left: 4px;
-    padding: 0 4px;
+    font-weight: 600;
+    padding: 0 5px;
+    text-align: center;
   }
-  .tabs button:not(.active) .dot { background: var(--accent); }
+  .meal-head .add-btn {
+    width: auto;
+    margin: 0 0 0 auto;
+    padding: 4px 10px;
+    font-size: 11px;
+    border-radius: 8px;
+  }
 
   /* Food list */
   .foods {
@@ -183,12 +184,6 @@
     background: var(--accent);
     color: #fff;
     border-color: var(--accent);
-  }
-  .empty {
-    text-align: center;
-    color: var(--muted);
-    padding: 28px 0;
-    font-size: 13px;
   }
   .food {
     display: flex;
@@ -331,8 +326,6 @@
   </div>
 </div>
 
-<div class="tabs" id="tabs"></div>
-
 <div class="foods" id="foods"></div>
 
 <div class="result">
@@ -415,106 +408,87 @@
   Object.assign(counts.lunch,     { chicken:  2, rice:    2, veggie: 1 });
   Object.assign(counts.dinner,    { chicken:  2, rice:    1, veggie: 1 });
 
-  let activeMeal = MEALS[0].id;
   let mode = 'cut';
   const pickerOpen = {}; // per meal
   MEALS.forEach(m => pickerOpen[m.id] = false);
 
-  // Render tabs
-  const tabsEl = $('tabs');
-  MEALS.forEach((m, i) => {
-    const b = document.createElement('button');
-    b.dataset.meal = m.id;
-    b.innerHTML = `${m.name}<span class="dot" style="display:none">0</span>`;
-    if (i === 0) b.classList.add('active');
-    b.addEventListener('click', () => {
-      activeMeal = m.id;
-      [...tabsEl.children].forEach(c => c.classList.toggle('active', c === b));
-      renderFoods();
-    });
-    tabsEl.appendChild(b);
-  });
-
-  function renderTabDots() {
-    [...tabsEl.children].forEach(b => {
-      const mealId = b.dataset.meal;
-      const sum = Object.values(counts[mealId]).reduce((a,b)=>a+b,0);
-      const dot = b.querySelector('.dot');
-      if (sum > 0) { dot.style.display = 'inline-block'; dot.textContent = sum; }
-      else dot.style.display = 'none';
-    });
-  }
-
-  // Render food list for active meal
+  // Render all meals stacked vertically — no tabs, everything visible at once
   const foodsEl = $('foods');
   function renderFoods() {
-    const meal = MEALS.find(m => m.id === activeMeal);
-    const open = pickerOpen[activeMeal];
-    const selected = meal.items.filter(k => counts[activeMeal][k] > 0);
+    const prevScroll = foodsEl.scrollTop;
 
-    const pickerHtml = `<div class="picker ${open ? '' : 'hidden'}">${
-      meal.items.map(key => {
-        const f = FOODS[key];
-        const n = counts[activeMeal][key];
-        return `<button class="chip ${n>0?'on':''}" data-pick="${key}">${f.name}${n>0?` ×${n}`:''}</button>`;
-      }).join('')
-    }</div>`;
+    foodsEl.innerHTML = MEALS.map(meal => {
+      const open = pickerOpen[meal.id];
+      const selected = meal.items.filter(k => counts[meal.id][k] > 0);
+      const total = Object.values(counts[meal.id]).reduce((a,b)=>a+b,0);
 
-    const listHtml = selected.length === 0
-      ? `<div class="empty">点上方「+ 添加食物」开始记录</div>`
-      : selected.map(key => {
+      const pickerHtml = `<div class="picker ${open ? '' : 'hidden'}">${
+        meal.items.map(key => {
           const f = FOODS[key];
-          const n = counts[activeMeal][key];
-          return `<div class="food">
-            <div class="info">
-              <div class="name">${f.name}</div>
-              <div class="macro">蛋白 ${f.p} · 脂肪 ${f.f} · 碳水 ${f.c}</div>
-            </div>
-            <div class="stepper" data-food="${key}">
-              <button class="minus" data-act="-1">−</button>
-              <span class="count">${n}</span>
-              <button class="plus" data-act="1">+</button>
-            </div>
-          </div>`;
-        }).join('');
+          const n = counts[meal.id][key];
+          return `<button class="chip ${n>0?'on':''}" data-meal="${meal.id}" data-pick="${key}">${f.name}${n>0?` ×${n}`:''}</button>`;
+        }).join('')
+      }</div>`;
 
-    foodsEl.innerHTML = `
-      <button class="add-btn ${open?'open':''}" id="addBtn">${open ? '收起' : '+ 添加食物'}</button>
-      ${pickerHtml}
-      ${listHtml}
-    `;
+      const listHtml = selected.map(key => {
+        const f = FOODS[key];
+        const n = counts[meal.id][key];
+        return `<div class="food">
+          <div class="info">
+            <div class="name">${f.name}</div>
+            <div class="macro">蛋白 ${f.p} · 脂肪 ${f.f} · 碳水 ${f.c}</div>
+          </div>
+          <div class="stepper" data-meal="${meal.id}" data-food="${key}">
+            <button class="minus" data-act="-1">−</button>
+            <span class="count">${n}</span>
+            <button class="plus" data-act="1">+</button>
+          </div>
+        </div>`;
+      }).join('');
 
-    $('addBtn').addEventListener('click', () => {
-      pickerOpen[activeMeal] = !pickerOpen[activeMeal];
-      renderFoods();
-    });
+      return `<section class="meal-section">
+        <div class="meal-head">
+          <span class="meal-title">${meal.name}</span>
+          ${total > 0 ? `<span class="meal-badge">${total}</span>` : ''}
+          <button class="add-btn ${open?'open':''}" data-toggle="${meal.id}">${open ? '收起' : '+ 添加食物'}</button>
+        </div>
+        ${pickerHtml}
+        ${listHtml}
+      </section>`;
+    }).join('');
 
-    foodsEl.querySelectorAll('.chip').forEach(c => {
-      c.addEventListener('click', () => {
-        const key = c.dataset.pick;
-        const next = Math.min(20, counts[activeMeal][key] + 1);
-        counts[activeMeal][key] = next;
-        renderFoods();
-        renderTabDots();
-      });
-    });
-
-    foodsEl.querySelectorAll('.stepper').forEach(s => {
-      s.addEventListener('click', e => {
-        const btn = e.target.closest('button');
-        if (!btn) return;
-        const key = s.dataset.food;
-        const delta = parseInt(btn.dataset.act);
-        const next = Math.max(0, Math.min(20, counts[activeMeal][key] + delta));
-        if (next === counts[activeMeal][key]) return;
-        counts[activeMeal][key] = next;
-        renderFoods();
-        renderTabDots();
-      });
-    });
+    foodsEl.scrollTop = prevScroll;
   }
+
+  // Single delegated click handler — handlers were per-render before, this avoids re-binding
+  foodsEl.addEventListener('click', e => {
+    const toggle = e.target.closest('[data-toggle]');
+    if (toggle) {
+      const mid = toggle.dataset.toggle;
+      pickerOpen[mid] = !pickerOpen[mid];
+      renderFoods();
+      return;
+    }
+    const chip = e.target.closest('.chip');
+    if (chip) {
+      const mid = chip.dataset.meal, key = chip.dataset.pick;
+      counts[mid][key] = Math.min(20, counts[mid][key] + 1);
+      renderFoods();
+      return;
+    }
+    const stepBtn = e.target.closest('.stepper button');
+    if (stepBtn) {
+      const s = stepBtn.closest('.stepper');
+      const mid = s.dataset.meal, key = s.dataset.food;
+      const next = Math.max(0, Math.min(20, counts[mid][key] + parseInt(stepBtn.dataset.act)));
+      if (next !== counts[mid][key]) {
+        counts[mid][key] = next;
+        renderFoods();
+      }
+    }
+  });
+
   renderFoods();
-  renderTabDots();
 
   // Mode switch
   $('modeSwitch').addEventListener('click', e => {
