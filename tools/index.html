@@ -377,13 +377,14 @@
     powder:      { name: '蛋白粉 1 勺',      p: 24,  f: 1,   c: 2  },
     mantou:      { name: '馒头 1 个',        p: 7,   f: 1.1, c: 47 },
     soymilk:     { name: '豆浆 250ml',       p: 7.5, f: 4,   c: 3  },
+    thickToast:  { name: '厚切吐司 1 片 (85g)', p: 7.6, f: 4.1, c: 52.8 },
   };
 
   const MEALS = [
     { id: 'breakfast',   name: '早餐',  items: ['mantou','soymilk','oat','egg','eggWhite','milk','bread','banana'] },
     { id: 'lunch',       name: '午餐',  items: ['rice','chicken','beef','veggie','sweetPotato','egg'] },
     { id: 'dinner',      name: '晚餐',  items: ['rice','chicken','salmon','eggWhite','veggie','noodle'] },
-    { id: 'postworkout', name: '练后餐',items: ['powder','banana','milk','apple','rice','nuts'] },
+    { id: 'postworkout', name: '练后餐',items: ['thickToast','powder','banana','milk','apple','rice','nuts'] },
   ];
 
   // Macro targets per kg bodyweight. Carbs get a per-hour-training bonus
@@ -403,10 +404,11 @@
     m.items.forEach(k => counts[m.id][k] = 0);
   });
 
-  // Personal defaults: 减脂, 66kg, 早 (4 蛋白+1 豆浆+1 馒头) / 午 (200g 鸡胸+2 米饭+1 蔬菜) / 晚 (200g 鸡胸+1 米饭+1 蔬菜)
-  Object.assign(counts.breakfast, { eggWhite: 4, soymilk: 1, mantou: 1 });
-  Object.assign(counts.lunch,     { chicken:  2, rice:    2, veggie: 1 });
-  Object.assign(counts.dinner,    { chicken:  2, rice:    1, veggie: 1 });
+  // Personal defaults: 减脂, 66kg, 早 (4 蛋白+1 豆浆+1 馒头) / 午 (200g 鸡胸+2 米饭+1 蔬菜) / 晚 (200g 鸡胸+1 米饭+1 蔬菜) / 练后 (1 片厚吐司)
+  Object.assign(counts.breakfast,  { eggWhite: 4, soymilk: 1, mantou:     1 });
+  Object.assign(counts.lunch,      { chicken:  2, rice:    2, veggie:     1 });
+  Object.assign(counts.dinner,     { chicken:  2, rice:    1, veggie:     1 });
+  Object.assign(counts.postworkout,{ thickToast: 1 });
 
   let mode = 'cut';
   const pickerOpen = {}; // per meal
