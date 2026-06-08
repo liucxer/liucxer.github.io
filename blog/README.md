@@ -4,28 +4,32 @@ Personal tech blog — kernel debugging, performance analysis, distributed syste
 
 **Published site**: https://liucxer.github.io/blog/
 
+每篇文章同时提供 **中文** 和 **English** 版本。
+Each post is available in both **中文** and **English**.
+
 ## Posts
 
-| Date | Title | Tags |
-|---|---|---|
-| 2026-06-08 | [一次 Linux bcache 写入卡顿 1 秒的深度排查](2026-06-08-bcache-root-lock-spike.html) | `linux-kernel` `bcache` `ceph` `bpf` `rwsem` |
-
-(Markdown source also kept in this directory: [`*.md`](.) — for raw / editable view.)
+| Date | Title | 中文 | English | Tags |
+|---|---|---|---|---|
+| 2026-06-08 | A Deep Dive into a 1-Second Linux bcache Write Stall — root btree Lock Contention | [zh](2026-06-08-bcache-root-lock-spike.zh.html) ([md](2026-06-08-bcache-root-lock-spike.zh.md)) | [en](2026-06-08-bcache-root-lock-spike.en.html) ([md](2026-06-08-bcache-root-lock-spike.en.md)) | `linux-kernel` `bcache` `ceph` `bpf` `rwsem` |
 
 ## Conventions
 
-- HTML page per post, named `YYYY-MM-DD-slug.html` (renders via GitHub Pages)
-- Markdown source kept alongside, same slug + `.md`
-- Shared `style.css` extends the site-wide design
-- Index in `index.html` lists all posts
-- All content desensitized — no company / hostname / internal data
+- **Bilingual**: each post is authored in both languages, kept in sync
+- **Filename**: `YYYY-MM-DD-slug.<lang>.<ext>` where `<lang>` ∈ {`zh`, `en`}, `<ext>` ∈ {`md`, `html`}
+- **Source**: `.md` (editable)
+- **Render**: `.html` (served via GitHub Pages, shares `style.css`)
+- **Language switcher**: each post has a `中文 · English` toggle at the top
+- **Index**: `index.html` lists all posts with both language links
+- **Content**: all real production data, desensitized
 
-## Workflow
+## Build workflow
 
-1. Draft as `.md`
-2. Convert to `.html` (preserving site style)
-3. Add entry to both `index.html` and this `README.md`
-4. Commit + push
+1. Write Chinese draft as `YYYY-MM-DD-slug.zh.md`
+2. Translate to English as `YYYY-MM-DD-slug.en.md` (or vice versa)
+3. Run the build script to generate both `.html` files (with shared chrome + lang switcher)
+4. Add entry to `index.html` and this `README.md`
+5. Commit + push
 
 ---
 

@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>A Deep Dive into a 1-Second Linux bcache Write Stall — From User-Visible Symptom to root btree Lock Contention · Tech Blog · Changxi Liu</title>
+  <meta name="description" content="In-depth investigation of a 1-3 second Linux bcache write stall: from D-state stack sampling and BPF lock-latency quantification, through disassembly of +0x10c, to a double-proof (exclusion + direct read of c->root) that the root btree node lock is the culprit.">
+  <meta property="og:title" content="A Deep Dive into a 1-Second Linux bcache Write Stall — From User-Visible Symptom to root btree Lock Contention">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://liucxer.github.io/blog/2026-06-08-bcache-root-lock-spike.en.html">
+  <link rel="alternate" hreflang="zh" href="https://liucxer.github.io/blog/2026-06-08-bcache-root-lock-spike.zh.html">
+  <link rel="alternate" hreflang="en" href="https://liucxer.github.io/blog/2026-06-08-bcache-root-lock-spike.en.html">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-brand"><a href="/">Changxi Liu</a></div>
+  <nav class="site-nav">
+    <a href="/">Apps</a>
+    <a href="/blog/" class="active">Blog</a>
+  </nav>
+</header>
+
+<main>
+
+  <article>
+
+    <div class="post-header">
+      <div class="lang-switcher">
+  <span class="current">English</span>
+  <span class="dot">·</span>
+  <a href="2026-06-08-bcache-root-lock-spike.zh.html">中文</a>
+</div>
+      <h1>A Deep Dive into a 1-Second Linux bcache Write Stall — From User-Visible Symptom to root btree Lock Contention</h1>
+      <div class="post-meta">
+        <span>2026-06-08</span>
+        <span class="dot">·</span>
+        <span>Changxi Liu</span>
+      </div>
+      <div class="post-tags"><span class="tag">linux-kernel</span><span class="tag">bcache</span><span class="tag">ceph</span><span class="tag">bpf</span><span class="tag">rwsem</span><span class="tag">performance</span></div>
+      <div class="accent"></div>
+    </div>
+
+    <div class="post-body">
+<h2>TL;DR</h2>
+<p>A production Ceph cluster running on bcache + HDD was hitting reproducible <strong>1-3 second write latency spikes</strong>, but only after a period of idleness followed by a burst. After 7 layers of evidence (including <strong>4 falsified hypotheses</strong>), the root cause was localized to <strong><code>rw_semaphore</code> contention on the <code>cache_set-&gt;root</code> btree node</strong> inside the bcache kernel module, specifically at <code>__bch_btree_map_nodes+0x10c</code>. The <code>rwsem</code> FIFO fairness rule <strong>amplifies</strong> an internal 100-300 ms lock wait into a second-scale user-visible spike. This post documents the full path, the 4 wrong guesses, and the final BPF + disassembly double-proof.</p>
+<p><strong>Keywords</strong>: Linux kernel, bcache, Ceph, rwsem, bpftrace/BCC, root btree contention</p>
+<hr />
+<h2>1. The scene: 1-second stall, but only under specific conditions</h2>
+<h3>1.1 Architecture</h3>
+<ul>
+<li>3-node Ceph cluster, 14 OSDs per node</li>
+<li>Each OSD backend: <code>bluestore</code> over <code>bcache</code> (writeback mode)</li>
+<li>bcache cache: NVMe (~1 TB) × 4 per node, aggregated into 3 cache_sets</li>
+<li>bcache backing: HDD (~12 TB) × 14 per node</li>
+<li>Clients use cephfs (via a juicefs gateway)</li>
+</ul>
+<h3>1.2 Symptom</h3>
+<pre><code>juicefs stats:
+  commit_lat normally 1-10 ms
+  → occasional jumps to 50-1000 ms (spike)
+  → sustained for 1-3 seconds
+  → self-heals, returns to 1-10 ms
+</code></pre>
+<p><strong>Critical trigger</strong>: After the system has been idle for a while, the client issues a burst <code>dd</code> of a large file. The first 2 seconds <strong>always</strong> trigger the spike. <strong>Continuous IO, by contrast, does not stall</strong>.</p>
+<p>This "idle-then-burst-only" pattern turned out to be the key clue.</p>
+<hr />
+<h2>2. Round 1: rule out the usual Ceph latency suspects</h2>
+<p>For any Ceph latency problem, start by ruling out the standard 5:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Cause</th>
+<th>How to rule out</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>scrub</code> / <code>deep-scrub</code></td>
+<td><code>ceph -s</code> shows no active scrub PGs during spike</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>recovery</code> / <code>backfill</code></td>
+<td><code>ceph -s</code> shows healthy cluster during spike</td>
+</tr>
+<tr>
+<td>3</td>
+<td>HDD slowness</td>
+<td><code>iostat -xm 1</code>: HDD <code>%util=0</code> during spike, fully idle</td>
+</tr>
+<tr>
+<td>4</td>
+<td>rocksdb compact</td>
+<td>OSD <code>perf dump</code>: <code>kv_sync_lat / commit_lat &lt; 5%</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>bcache design</strong></td>
+<td>OSD <code>perf dump</code>: <strong><code>state_aio_wait_lat / commit_lat = 96%+</code></strong> ← hit</td>
+</tr>
+</tbody>
+</table>
+<p>Cause #5 hits, narrowing the focus to the BLOCK layer (NVMe→bcache→HDD).</p>
+<h3>2.1 First weird observation</h3>
+<p><code>iostat</code> during the spike shows:
+- <code>bcache0</code> etc.: <code>%util=100%</code>, but <code>aqu-sz=0</code>, <code>wMB/s=0</code>, <code>w_await=0</code>
+- NVMe device: <code>%util=0</code>
+- HDD device: <code>%util=0</code></p>
+<p><strong>bcache is "busy" but no IO is being submitted.</strong> Classic signature of "bio entered bcache but got stuck on some software-layer wait inside it".</p>
+<hr />
+<h2>3. Round 2: capture the kernel stacks of D-state tasks</h2>
+<p>I wrote a simple high-frequency <code>/proc/&lt;tid&gt;/stack</code> sampler that fires during spikes:</p>
+<pre><code>==== dstate_140000_w57_n81.log (81 stacks captured) ====
+57  comm=tp_osd_tp       top=cached_dev_make_request   ← Ceph OSD writer
+3   comm=bcache_writebac top=bch_writeback_thread       ← bcache writeback kthread
+1   comm=kworker         top=__bch_btree_map_nodes      ← btree op
+others: node_exporter etc. (sysfs readers — noise)
+</code></pre>
+<p><strong>70 % of D-state tasks are <code>tp_osd_tp</code> with stack top at <code>cached_dev_make_request+0x3e0</code></strong>.</p>
+<h3>3.1 Disassembly pins down +0x3e0</h3>
+<pre><code class="language-bash">KO=/lib/modules/$(uname -r)/kernel/drivers/md/bcache/bcache.ko
+objdump -d $KO | grep -A 50 '&lt;cached_dev_make_request&gt;'
+</code></pre>
+<p>The line at offset <code>+0x3e0</code>:</p>
+<pre><code class="language-asm">14bb4: bl  &lt;down_read&gt;              ; call down_read
+14bb8: ldr ...                       ; +0x3e0 (down_read return point)
+</code></pre>
+<p>→ <strong><code>+0x3e0</code> is the return point of the <code>down_read(&amp;dc-&gt;writeback_lock)</code> call</strong>.</p>
+<p>Writers are stuck in bcache's <code>writeback_lock</code> (per-cached_dev rw_semaphore).</p>
+<h3>3.2 Hypothesis 1: direct contention on writeback_lock</h3>
+<p>The most obvious guess: writers queue on <code>writeback_lock</code>. But who's on the writer side?</p>
+<p>In bcache, only <code>bch_writeback_thread</code> (the background writeback kthread) calls <code>down_write(&amp;dc-&gt;writeback_lock)</code>, doing <code>refill_dirty</code>.</p>
+<p><strong>Hypothesized mechanism</strong>: the rwsem FIFO fairness rule. Once a writer is queued, subsequent readers must also queue (to prevent writer starvation). This amplifies the writer's tens-of-millisecond hold window into a user-visible 1-second-plus spike.</p>
+<p>This hypothesis is <strong>partially correct</strong> (later confirmed as an <em>amplifier</em>), but it's not the root cause, because: <strong>what is the original source of long lock hold time on the writer side?</strong></p>
+<hr />
+<h2>4. Round 3: measure lock latency precisely with BPF</h2>
+<p><code>/proc/stack</code> sampling has limits:
+- 100 ms sampling interval misses short contentions
+- Only sees "a snapshot while stalled", can't quantify "how long was it stalled"</p>
+<p>Upgrade to BPF. The environment is OpenEuler 20.03 LTS, kernel 4.19.90 — <code>bpftrace</code> isn't packaged (would need to build from source), but <code>bcc-tools</code> is. Note: in OpenEuler the Python module is named <code>bpfcc</code> (not <code>bcc</code>), so any BCC Python script needs an import compatibility layer.</p>
+<h3>4.1 funclatency: histogram of rwsem slow-path duration</h3>
+<pre><code class="language-bash">sudo /usr/share/bcc/tools/funclatency -m 'rwsem_down_read_failed'
+</code></pre>
+<p>Result over 60 seconds:</p>
+<pre><code>msecs               : count    distribution
+   0 -&gt; 1           : 1410    |****************************************|
+   2 -&gt; 3           : 221     |******                                  |
+   4 -&gt; 7           : 433     |************                            |
+   8 -&gt; 15          : 545     |***************                         |
+  16 -&gt; 31          : 88      |**                                      |
+  32 -&gt; 63          : 5       |                                        |
+  64 -&gt; 127         : 260     |*******                                 |
+ 128 -&gt; 255         : 109     |***                                     |
+ 256 -&gt; 511         : 0       |                                        |
+ 512 -&gt; 1023        : 3       |                                        |
+1024 -&gt; 2047        : 42      |*                                       |  ← 1-2 s
+2048 -&gt; 4095        : 11      |                                        |  ← 2-4 s
+</code></pre>
+<p><strong>Bimodal distribution</strong>:
+- 0-16 ms: normal or minor contention (~2,600 events)
+- <strong>1-4 s</strong>: 53 extreme spike events</p>
+<p>53 lock waits over 1 second, perfectly matching the user-reported "1-2 second stalls".</p>
+<h3>4.2 funcslower: capture full stacks</h3>
+<pre><code class="language-bash">sudo /usr/share/bcc/tools/funcslower -m 50 -K 'rwsem_down_read_failed'
+</code></pre>
+<p>Captured 194 spike events in 60 seconds (clustered in a 3-second burst):</p>
+<pre><code>==== [11:41:08] event ====
+  comm     : tp_osd_tp
+  pid/tid  : 980986/981104
+  latency  : 1482 ms
+  lock     : 0xffff80464a160d18
+  kstack   :
+    rwsem_down_read_failed
+    cached_dev_make_request+0x3e0     ← matches /proc/stack
+    generic_make_request+0x17c
+    submit_bio+0x5c
+    blkdev_direct_IO+0x3b0
+    aio_write+0xec
+    __arm64_sys_io_submit+0xb4
+    el0_svc+0x8
+
+==== [11:41:08] event ====
+  comm     : kworker/9:65
+  pid/tid  : 256329/256329
+  latency  : 307 ms
+  lock     : 0xffff8052b466a860   ← ★ different lock address!
+  kstack   :
+    rwsem_down_read_failed
+    __bch_btree_map_nodes+0x10c   ← ★ different function
+    bch_btree_insert+0xe8
+    bch_data_insert_keys+0xd0
+    process_one_work+0x1b4
+    worker_thread+0x54
+</code></pre>
+<p><strong>Key finding</strong>: lock contention shows up in <strong>two distinct locations</strong>:
+1. <code>tp_osd_tp</code> at <code>cached_dev_make_request+0x3e0</code> (writeback_lock)
+2. <code>kworker</code> at <code>__bch_btree_map_nodes+0x10c</code> (a different rwsem)</p>
+<p>The lock addresses fall into two groups:
+- 14 addresses ending in <code>d18</code> — looks per-device, likely the 14 cached_dev writeback_locks
+- <strong>2 addresses ending in <code>860</code></strong> — only 2 distinct addresses but they account for 67 % of all events</p>
+<h3>4.3 Hypothesis 2: btree cache miss</h3>
+<p>Why does the lock wait so long? First intuitive guess: <strong>btree node cache miss</strong>. bcache holds an LRU cache of btree nodes (each 256 KB) in memory (<code>btree_cache_size</code>).</p>
+<pre><code>Total btree nodes:           ~34,000 per cache_set × 3 cache_sets = ~100k nodes
+Memory to hold all in cache: 34,000 × 256 KB = 8.6 GB per cache_set
+Actual btree_cache_size:     8.0 GB per cache_set
+                             ↑
+                       5 % short, so LRU eviction is unavoidable
+</code></pre>
+<p>When the system is idle, btree nodes get evicted. On the next burst, the first wave of accesses hits the missing nodes → synchronous 256 KB reads from NVMe → lock held for hundreds of milliseconds → spike.</p>
+<p><strong>A clean theory</strong>. Time to prove it.</p>
+<p>I wrote a BPF tracer that hooks <code>bch_btree_node_read</code> (only called on cache miss):</p>
+<pre><code class="language-python"># btree_miss_tracker.py — track key bcache functions
+# - bch_btree_node_get   every access (hit + miss)
+# - bch_btree_node_read  only on cache miss
+</code></pre>
+<p>Ran for 60 seconds under heavy load:</p>
+<pre><code>ts          get/s    miss/s   alloc/s   hit_rate
+15:09:12   13396.3      0.0       0.4    100.00%
+15:09:17   13223.2      0.0       6.4    100.00%
+15:09:22   13902.5      0.0       6.4    100.00%
+
+Total btree accesses (get):    282,904
+Total cache misses (read):           0
+Hit rate:                       100.00%
+</code></pre>
+<p><strong>282,904 btree accesses, zero cache misses.</strong></p>
+<p><strong>Hypothesis 2 falsified</strong> ❌. Every btree node was in memory the whole time, no NVMe reads needed.</p>
+<p>An important scientific moment: a measured falsification of one's own theory. Disappointing but it brings the truth closer.</p>
+<hr />
+<h2>5. Round 4: the root lock contention hypothesis</h2>
+<p>If btree is fully cached, what is the lock waiting on? Look at the data again:</p>
+<ul>
+<li>67 % of lock events in the 60-second window cluster on <strong>2 lock addresses</strong></li>
+<li>The btree has 100k+ nodes total, one rwsem per node</li>
+<li>Only 2 hot ones = <strong>these 2 are globally shared</strong></li>
+</ul>
+<p>In bcache, the only "globally shared btree node locks" can be <strong>the root btree node lock of each cache_set</strong>. With 3 cache_sets, there should be 3 root locks, but only 2 hot — possibly the third wasn't busy during this particular spike.</p>
+<h3>5.1 Read the bcache source</h3>
+<pre><code class="language-c">// btree.h — the bcache_btree_root macro (initially overlooked)
+#define bcache_btree_root(fn, c, op, ...) ({                          \
+    int _r = -EINTR;                                                  \
+    do {                                                              \
+        struct btree *_b = (c)-&gt;root;        /* ← take c-&gt;root */    \
+        bool _w = insert_lock(op, _b);                                \
+        rw_lock(_w, _b, _b-&gt;level);          /* ← ★ lock root */     \
+        if (_b == (c)-&gt;root &amp;&amp; _w == insert_lock(op, _b)) {           \
+            _r = bch_btree_ ## fn(_b, op, ##__VA_ARGS__);             \
+        }                                                              \
+        rw_unlock(_w, _b);                                            \
+        ...                                                            \
+    } while (_r == -EINTR);                                           \
+    _r;                                                                \
+})
+</code></pre>
+<p><code>__bch_btree_map_nodes</code> (the function we saw in spike stacks) calls <code>bcache_btree_root</code>, whose <strong>first step is to take the lock on root</strong>. Every btree write (including <code>bch_btree_insert</code>) starts here.</p>
+<p>70 concurrent writers → all must pass through the root lock → queue depth spikes → spike.</p>
+<h3>5.2 Disassemble <code>__bch_btree_map_nodes+0x10c</code></h3>
+<pre><code class="language-bash">objdump -d $KO | grep -A 200 '&lt;__bch_btree_map_nodes&gt;:'
+</code></pre>
+<p>Localize <code>+0x10c</code>:</p>
+<pre><code class="language-asm">b5b0: &lt;__bch_btree_map_nodes&gt;:                  ; function start
+b5e8: add  x22, x1, #0x8, lsl #12               ; x22 = c + 0x8000
+b600: ldr  x19, [x22, #20072]                    ; x19 = *(c + 0xCE68) = c-&gt;root
+b608: add  x25, x19, #0x60                       ; x25 = &amp;root-&gt;lock
+b614: mov  x0, x25                                ; x0 = &amp;root-&gt;lock
+b618: b.gt b6b8                                   ; branch on read vs write decision
+b61c: bl   &lt;down_write&gt;                          ; +0x6c: down_write
+...
+b6b8: bl   &lt;down_read&gt;                           ; +0x108: down_read
+b6bc: ldr  x0, [x22, #20072]                     ; +0x10c (down_read return point)
+</code></pre>
+<p><strong><code>+0x10c</code> is the return point of <code>down_read(&amp;root-&gt;lock)</code></strong>. Seeing this offset in the stack means: the thread is currently inside <code>down_read</code>, suspended via <code>schedule()</code>.</p>
+<p><code>x19</code> is <code>c-&gt;root</code> (the root btree node of the cache_set), <code>x25</code> is <code>&amp;root-&gt;lock</code>.</p>
+<h3>5.3 Double proof via BPF</h3>
+<p>Two independent BPF verification scripts:</p>
+<p><strong>Method 1: Proof by exclusion</strong></p>
+<p>Trace every return value of <code>bch_btree_node_get</code> (used to access <strong>child nodes</strong>), and compute <code>&amp;b-&gt;lock</code> for each. If the hot address <code>0xffff8052b466a860</code> is <em>not</em> in this set, then it's not a child lock → it must be root.</p>
+<p><strong>Method 2: Read c-&gt;root directly</strong></p>
+<p>Hook <code>__bch_btree_map_nodes</code> on entry. The 2nd argument is <code>cache_set *c</code>. Use <code>bpf_probe_read_kernel(&amp;root, c + 0xCE68)</code> to follow <code>c-&gt;root</code> directly, then compute <code>&amp;root-&gt;lock = root + 0x60</code>, and see whether it matches the hot addresses.</p>
+<pre><code>Method 1: proof by exclusion
+  10,240 child node lock addresses observed via bch_btree_node_get
+
+  Comparison:
+    0xffff8052b466a860  ← ✓ not in child set → must be root
+    0xffffa057687eb860  ← ✓ not in child set → must be root
+
+Method 2: read c-&gt;root directly
+  3 root lock addresses observed:
+    0xffff804880f93c60  accessed 34,289 times  (cache_set A, no spike)
+    0xffffa057687eb860  accessed 26,148 times  (cache_set B) ★ MATCH
+    0xffff8052b466a860  accessed 23,959 times  (cache_set C) ★ MATCH
+
+✓ Double-proven: both hot addresses are ROOT btree node locks.
+</code></pre>
+<p><strong>Two independent methods, different paths, same conclusion.</strong> Textbook kernel-debug proof.</p>
+<h3>5.4 An interesting observation: the busiest cache_set wasn't the one stalling</h3>
+<p><code>cache_set A</code>'s root was accessed 34,289 times — more than B or C — <strong>yet it never appeared in spike contention</strong>. That tells us:</p>
+<blockquote>
+<p>A spike isn't driven by "absolute access volume". It's driven by "instantaneous arrival rate plus a confluence of triggers."</p>
+</blockquote>
+<p>cache_set A's accesses were likely spread out over time; B and C absorbed the burst.</p>
+<hr />
+<h2>6. But wait — why is it a bursty spike, not sustained slowness?</h2>
+<p>If it were purely root lock contention, <strong>continuous load should also be slow</strong>. But the observation is:</p>
+<pre><code>continuous load    → no stall
+idle then burst    → 1-3 s spike
+</code></pre>
+<p>Root lock contention alone doesn't explain that <strong>time-pattern</strong>. There must be additional factors.</p>
+<h3>6.1 The real multi-factor model</h3>
+<pre><code>&quot;bursty spike&quot; = 4 latent factors ignited simultaneously
+
+  Factor A (intrinsic):
+    bcache's centralized btree design → one root per cache_set → high-concurrency
+    convergence point
+
+  Factor B (idle-triggered):
+    After idleness, writeback_thread enters sleep (dirty=0, nothing to do)
+    → On burst, it wakes up and immediately wants down_write(writeback_lock)
+    → ★ triggers rwsem FIFO fairness
+    → subsequent readers (tp_osd_tp) all queue behind it
+
+  Factor C (bursty arrival):
+    dd submits 8 GB in one shot
+    → ceph triplicates → N nodes × M threads = ~70 concurrent writers
+    → they all hit root lock at the same instant
+    → ★ queue depth jumps from 0 to 70
+
+  Factor D (amplifier):
+    The FIFO fairness rule on cached_dev-&gt;writeback_lock
+    Amplifies the root lock's internal 100-300 ms wait
+    into a 1-3 s wait visible on cached_dev_make_request
+    → user-visible
+
+  → all 4 simultaneously → spike
+
+Under continuous load:
+  B doesn't hold (writeback_thread is continuously active, never sleeps deeply)
+  C doesn't hold (arrivals are time-distributed, steady-state queue is short)
+  → only A + weak D remain, no user-visible stall
+</code></pre>
+<h3>6.2 This explains every counterintuitive observation</h3>
+<table>
+<thead>
+<tr>
+<th>Counterintuitive</th>
+<th>Explanation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Continuous IO doesn't stall; idle-then-burst does</td>
+<td>B+C only hold during the idle→burst transition</td>
+</tr>
+<tr>
+<td>Busiest cache_set didn't stall</td>
+<td>Its accesses are spread out; factor C doesn't apply</td>
+</tr>
+<tr>
+<td>btree cache miss = 0</td>
+<td>Nodes are in memory; the lock wait isn't on IO</td>
+</tr>
+<tr>
+<td>Child node locks are always fast</td>
+<td>No one converges on a child node</td>
+</tr>
+<tr>
+<td>Lock waits 1-3 s but each op is microseconds</td>
+<td>rwsem FIFO + writeback_lock 2-stage amplification</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>7. The full causal chain</h2>
+<pre><code>[T = -∞ ~ 0]  System is idle, all 4 latent factors in position:
+  · writeback_thread sleeping
+  · root lock idle (no writer queued)
+  · closure queue empty
+  · cached_dev-&gt;writeback_lock fully idle
+
+[T = 0]       Client dd burst of 8 GB
+
+[T = 0+1ms]   Ceph triplicates, 70 tp_osd_tp call io_submit concurrently
+  → 70 cached_dev_make_request almost simultaneously
+  → 70 down_read(writeback_lock) all succeed (rwsem allows concurrent readers)
+  → 70 closures enqueued onto bcache_writeback_wq
+
+[T = 0+5ms]   70 kworkers concurrently run bch_data_insert chain
+  → each invokes __bch_btree_map_nodes
+  → first thing: down_read(root-&gt;lock)
+  → ★ 70 readers contend for the same root lock
+  → one wins and starts the btree insert; the other 69 queue
+
+[T = 0+50ms]  Some closure triggers a btree node split, needs down_write(root)
+  → root lock transitions to write mode
+  → rwsem FIFO triggers: new readers must queue too
+
+[T = 0+100ms] Concurrently, dirty rises sharply, writeback_thread wakes up
+  → it calls down_write(writeback_lock)
+  → finds too many holders, queues
+  → ★ writeback_lock FIFO triggers
+  → incoming tp_osd_tp down_read(writeback_lock) also queue
+
+[T = 0+100ms ~ 0+2s]  Double-FIFO blockage
+  → kworker stuck on root-&gt;lock
+  → tp_osd_tp stuck on writeback_lock
+  → cached_dev_make_request returns 1-2 s late, visible to user
+
+[T = 0+1.5s ~ 0+3s]   Locks released layer by layer
+  → btree insert finishes, root lock released
+  → kworker completes closure, releases writeback_lock read
+  → writeback_thread acquires write lock, refills, releases
+  → queued tp_osd_tp swarm in and acquire reads
+  → user-visible recovery
+
+[T &gt; 0+3s]    Steady state
+  → writeback_thread continuously busy, never sleeps deeply
+  → btree stays hot
+  → closure queue stable
+  → ★ no further spikes
+
+[T &gt; 0+N s, business stops]
+  → System goes idle again, all 4 factors re-arm
+  → Next burst → spike again
+</code></pre>
+<hr />
+<h2>8. Mitigation comparison</h2>
+<p>I tested 4 sysfs-tunable scenarios via an automated A/B test harness with multiple phases:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Factor it attacks</th>
+<th>Spike effect</th>
+<th>Side effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cache_mode=writethrough</code></td>
+<td>Bypass the bcache write path entirely</td>
+<td>✅ spike gone</td>
+<td>Steady-state write latency jumps from ~5 ms to 50-150 ms (HDD passthrough)</td>
+</tr>
+<tr>
+<td><code>writeback_running=0</code></td>
+<td>Kill writeback_thread (factor B)</td>
+<td>✅ spike gone</td>
+<td>Dirty data never flushes, cache fills up within hours</td>
+</tr>
+<tr>
+<td><code>wb_aggressive</code> (raise writeback rate)</td>
+<td>Keep writeback_thread perpetually busy</td>
+<td>✅ spike heavily reduced</td>
+<td>Under sustained load, HDD stays busy, average latency +80%</td>
+</tr>
+<tr>
+<td>Default (baseline)</td>
+<td>—</td>
+<td>❌ persistent spike</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>No silver bullet.</strong> Each option has a tradeoff.</p>
+<h3>8.1 wb_aggressive in detail</h3>
+<pre><code class="language-bash"># Adjust all three together (per cached_dev)
+echo 1     &gt; /sys/block/bcacheN/bcache/writeback_percent              # default 10
+echo 40960 &gt; /sys/block/bcacheN/bcache/writeback_rate_minimum         # default 8 (sectors/sec)
+echo 1     &gt; /sys/block/bcacheN/bcache/writeback_rate_update_seconds  # default 5
+</code></pre>
+<p><strong>Why it works</strong>: writeback_thread sustains 20+ MB/s instead of the default 4 KB/s, never goes into deep sleep, eliminates factor B.</p>
+<p><strong>Suits</strong>: intermittent burst workloads (typical OLTP, VM IO, test environments running dd).
+<strong>Doesn't suit</strong>: sustained high-throughput writes (more SSD write amplification, constantly busy HDD).</p>
+<h3>8.2 Long-term option</h3>
+<p>Increase <code>bucket_size</code> from 512 KB to 2-4 MB. Cost: requires reprovisioning bcache devices (offline data migration). Benefits:</p>
+<ul>
+<li>btree node count drops 4-8×, the whole btree fits in memory permanently</li>
+<li>Fundamentally reduces root contention (fewer splits, shallower tree)</li>
+<li>But this is a hardware/deployment-time decision</li>
+</ul>
+<hr />
+<h2>9. Reflection on methodology</h2>
+<h3>9.1 The tool chain</h3>
+<table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Tool</th>
+<th>Outcome</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Initial triage</td>
+<td><code>iostat</code>, <code>ceph -s</code>, OSD perf dump</td>
+<td>Rule out the standard 5</td>
+</tr>
+<tr>
+<td>Stack sampling</td>
+<td>High-rate read of <code>/proc/&lt;tid&gt;/stack</code></td>
+<td>Find D-state tasks and function offsets</td>
+</tr>
+<tr>
+<td>Disassembly</td>
+<td><code>objdump -d bcache.ko</code></td>
+<td>Translate <code>+0x3e0</code> <code>+0x10c</code> to specific function calls</td>
+</tr>
+<tr>
+<td>Lock latency</td>
+<td><code>bcc-tools funclatency</code></td>
+<td>Histogram proving 1-2 s lock waits</td>
+</tr>
+<tr>
+<td>Slow-path stacks</td>
+<td><code>bcc-tools funcslower -K</code></td>
+<td>Lock wait + stack as a combined event</td>
+</tr>
+<tr>
+<td>Custom BPF</td>
+<td>Python + BCC API</td>
+<td>Falsify hypotheses (cache miss = 0) and verify directly (root lock)</td>
+</tr>
+<tr>
+<td>A/B validation</td>
+<td>Automated sysfs A/B harness</td>
+<td>Quantify each fix</td>
+</tr>
+</tbody>
+</table>
+<h3>9.2 The 4 falsified hypotheses (the heart of the scientific method)</h3>
+<pre><code>Hypothesis 1: writeback_lock direct contention
+  → partially right, but only the visible part (amplifier)
+
+Hypothesis 2: btree cache miss
+  → falsified (miss = 0)
+
+Hypothesis 3: generic btree node lock contention (any node, anywhere)
+  → falsified (child nodes consistently 1-2 μs)
+
+Hypothesis 4: root btree node lock contention (the real root cause)
+  → double-proven
+</code></pre>
+<p><strong>Good kernel debugging isn't about guessing right on the first try.</strong> It's about falsifying, refining, falsifying again, until only one possibility remains — and then independently verifying it.</p>
+<h3>9.3 Heuristics for similar problems</h3>
+<ol>
+<li><strong>Knock out the obvious first</strong> — the 5 standard Ceph causes account for ~80 % of cases.</li>
+<li><strong>Break commit_lat down</strong> — the share that's <code>aio_wait</code> is a key discriminator.</li>
+<li><strong>Don't trust hunches, write scripts to verify them</strong> — hypothesis 2 (cache miss) was popped by hard BPF data.</li>
+<li><strong>Disassembly is the final arbiter</strong> — an offset like <code>+0x3e0</code> can only be translated by reading the actual machine code.</li>
+<li><strong>Independent multi-path verification</strong> — when proof by exclusion and direct readout give the same answer, the conclusion is rock-solid.</li>
+<li><strong>Pay attention to time patterns</strong> — "stalls only on idle-then-burst" rules out static contention hypotheses and forces you to look for trigger conditions.</li>
+<li><strong>Accept that there's no silver bullet</strong> — every fix has a tradeoff; pick based on actual business profile.</li>
+</ol>
+<hr />
+<h2>10. Suggestions for bcache upstream</h2>
+<p>This case is really an <strong>inherent design limitation</strong> of bcache:</p>
+<ol>
+<li><strong>Centralized btree</strong>: one btree per cache_set, one root → unavoidable root contention under concurrency.</li>
+<li><strong>rwsem FIFO fairness</strong>: doesn't compose well with bcache's "closure-based async chains + locks held across thread boundaries" pattern.</li>
+<li><strong>Default writeback rate too low</strong>: <code>writeback_rate_minimum=8</code> (= 4 KB/s) is effectively "off". Relies on the PID controller ramping up, but the PID is slow to react.</li>
+</ol>
+<p>Possible kernel improvements:
+- Replace root lock with <code>seqlock</code> or RCU (readers don't block behind queued writers).
+- Avoid holding locks across closure boundaries (restructure release timing).
+- Saner default writeback rate (several MB/s instead of KB/s).</p>
+<p>That said, bcache has largely been superseded by <code>bcachefs</code> (the next-generation rewrite), so upstream momentum is limited. Pragmatic short-term remediation is the sysfs tuning above.</p>
+<hr />
+<h2>11. Summary</h2>
+<pre><code>Symptom:  1-3 s business stalls, only triggered by idle-then-burst
+Root cause:
+  rwsem queueing on bcache's per-cache_set root btree node under
+  concurrent writers + 2-stage amplification via writeback_lock's FIFO
+  fairness
+
+Evidence:
+  · BPF funclatency: 53 lock-waits between 1-4 s in 1 minute
+  · BPF funcslower: 194 spike events with complete stacks containing
+    cached_dev_make_request+0x3e0
+  · Disassembly: the offsets correspond to
+    down_read(writeback_lock) and down_read(root-&gt;lock)
+  · Exclusion + direct readout of c-&gt;root: double-proves hot locks are root
+  · Falsified hypotheses: btree cache miss = 0; child node locks fast
+
+Fixes:
+  · Intermittent workloads: wb_aggressive (raise writeback rate)
+  · Emergency: writethrough (heavy cost but stable)
+  · Long-term: bucket_size upgrade, or rethink cache architecture
+</code></pre>
+<p>The investigation went from a fuzzy "business is slow" to a precise function offset, a specific lock object, and a specific kernel code line, via 7 layers of evidence and 4 hypothesis-falsifications. <strong>This is the joy of kernel debugging</strong> — you think it's a network issue, it turns out to be the disk; you think it's the disk, it turns out to be a lock; you think it's a lock, it turns out to be a specific inline macro + rwsem FIFO + bursty arrival rates layered together.</p>
+<p>Hope this case is useful to anyone debugging similar things.</p>
+<hr />
+<h2>Appendix A: key BPF snippets</h2>
+<h3>A.1 Proof by exclusion (is the hot lock root?)</h3>
+<pre><code class="language-python"># Trace returns of bch_btree_node_get
+# Compute &amp;b-&gt;lock = b + 0x60 (offset taken from disassembly)
+# If the hot address isn't in this set, it must be root.
+
+int kretprobe_get(struct pt_regs *ctx) {
+    u64 b = PT_REGS_RC(ctx);
+    if (!b) return 0;
+    u64 lock_addr = b + 0x60;
+    child_locks.update(&amp;lock_addr, ...);
+    return 0;
+}
+</code></pre>
+<h3>A.2 Direct readout of c-&gt;root</h3>
+<pre><code class="language-python"># Hook __bch_btree_map_nodes(op, c, ...)
+# c is arg1, read c-&gt;root (offset 0xCE68)
+
+int kprobe_map_nodes(struct pt_regs *ctx) {
+    void *c = (void *)PT_REGS_PARM2(ctx);
+    void *root;
+    bpf_probe_read_kernel(&amp;root, sizeof(root), (char *)c + 0xCE68);
+    u64 root_lock = (u64)root + 0x60;
+    root_locks.update(&amp;root_lock, ...);
+    return 0;
+}
+</code></pre>
+<h2>Appendix B: key disassembly snippets</h2>
+<pre><code class="language-asm">000000000000b5b0 &lt;__bch_btree_map_nodes&gt;:
+    b5b0: stp x29, x30, [sp, #-112]!
+    ...
+    b5d0: mov x21, x1                  ; x21 = cache_set (arg1)
+    b5e8: add x22, x1, #0x8, lsl #12   ; x22 = c + 0x8000
+    b600: ldr x19, [x22, #20072]       ; x19 = c-&gt;root (offset 0xCE68 from c)
+    b608: add x25, x19, #0x60          ; x25 = &amp;root-&gt;lock
+    b60c: ldrb w1, [x19, #194]         ; b-&gt;level
+    b610: cmp w1, w0                   ; level vs op-&gt;lock
+    b614: mov x0, x25                  ; x0 = &amp;root-&gt;lock
+    b618: b.gt b6b8                    ; if level &gt; requested, jump to read path
+    b61c: bl &lt;down_write&gt;              ; +0x6c: write lock
+    ...
+    b6b8: bl &lt;down_read&gt;               ; +0x108: read lock
+    b6bc: ldr x0, [x22, #20072]        ; +0x10c (down_read return point) ★
+</code></pre>
+<h2>Appendix C: full causal-chain timeline</h2>
+<pre><code>T=0    Business burst (dd 8 GB)
+T=0+1  70 tp_osd_tp enter cached_dev_make_request
+T=0+1  70 down_read(writeback_lock) succeed (concurrent readers)
+T=0+1  70 closures enqueue onto bcache_writeback_wq
+T=0+5  70 kworkers run __bch_btree_map_nodes
+T=0+5  70 down_read(root-&gt;lock) — first succeeds, the other 69 queue
+T=0+50 First closure finishes, releases root
+T=0+50 Second closure acquires root (possibly down_write for a split)
+T=0+100 Dirty surges, writeback_thread wakes up
+T=0+100 writeback_thread down_write(writeback_lock) — queues
+T=0+100 ★ rwsem FIFO triggers, new down_read also queues
+T=0+1500 ~ T=0+3000  double-FIFO blockage period
+        - kworkers stuck on root-&gt;lock
+        - tp_osd_tp stuck on writeback_lock
+        - user observes 1-3 s spike
+T=0+3000 Lock chain releases, queues drain, spike passes
+T&gt;0+5s   Steady state (writeback continuously active), no more spikes
+</code></pre>
+<hr />
+<p><em>Based on a real production case, desensitized. All kernel addresses / PIDs / process names are real data with no sensitive content. bcache source references are against kernel 4.19.</em></p>
+    </div>
+
+  </article>
+
+</main>
+
+<footer class="site-footer">
+  <p>
+    <a href="/blog/">← Back to Blog</a>
+    &nbsp;·&nbsp;
+    <a href="/">Home</a>
+    &nbsp;·&nbsp;
+    Contact: <a href="mailto:liucxer@gmail.com">liucxer@gmail.com</a>
+  </p>
+</footer>
+
+</body>
+</html>

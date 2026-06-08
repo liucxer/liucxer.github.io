@@ -7,7 +7,9 @@
   <meta name="description" content="深度排查一个 Linux bcache 写入 1-3 秒卡顿: 从 D-state 栈采样, BPF 锁延迟量化, 反汇编锁定 +0x10c, 到最终用排除法 + 直接读 c->root 双重证明 root btree node 锁竞争.">
   <meta property="og:title" content="一次 Linux bcache 写入卡顿 1 秒的深度排查 — 从用户感知到 root btree 锁竞争">
   <meta property="og:type" content="article">
-  <meta property="og:url" content="https://liucxer.github.io/blog/2026-06-08-bcache-root-lock-spike.html">
+  <meta property="og:url" content="https://liucxer.github.io/blog/2026-06-08-bcache-root-lock-spike.zh.html">
+  <link rel="alternate" hreflang="en" href="https://liucxer.github.io/blog/2026-06-08-bcache-root-lock-spike.en.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://liucxer.github.io/blog/2026-06-08-bcache-root-lock-spike.zh.html">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -25,6 +27,11 @@
   <article>
 
     <div class="post-header">
+      <div class="lang-switcher">
+  <span class="current">中文</span>
+  <span class="dot">·</span>
+  <a href="2026-06-08-bcache-root-lock-spike.en.html">English</a>
+</div>
       <h1>一次 Linux bcache 写入卡顿 1 秒的深度排查 — 从用户感知到 root btree 锁竞争</h1>
       <div class="post-meta">
         <span>2026-06-08</span>

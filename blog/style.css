@@ -55,6 +55,33 @@ main { max-width: 760px; margin: 0 auto; }
 
 .site-nav a:hover, .site-nav a.active { color: var(--accent); }
 
+/* ===== Language switcher ===== */
+.lang-switcher {
+  font-size: 12px;
+  color: var(--secondary);
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  margin-bottom: 12px;
+  letter-spacing: 0.02em;
+}
+
+.lang-switcher .current {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.lang-switcher a {
+  color: var(--secondary);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.lang-switcher a:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.lang-switcher .dot { margin: 0 8px; opacity: 0.5; }
+
 /* ===== Article header ===== */
 .post-header { margin-bottom: 40px; }
 
