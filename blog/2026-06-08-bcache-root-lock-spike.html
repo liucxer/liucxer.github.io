@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>一次 Linux bcache 写入卡顿 1 秒的深度排查 — 从用户感知到 root btree 锁竞争 · Tech Blog · Changxi Liu</title>
+  <meta name="description" content="深度排查一个 Linux bcache 写入 1-3 秒卡顿: 从 D-state 栈采样, BPF 锁延迟量化, 反汇编锁定 +0x10c, 到最终用排除法 + 直接读 c->root 双重证明 root btree node 锁竞争.">
+  <meta property="og:title" content="一次 Linux bcache 写入卡顿 1 秒的深度排查 — 从用户感知到 root btree 锁竞争">
+  <meta property="og:type" content="article">
+  <meta property="og:url" content="https://liucxer.github.io/blog/2026-06-08-bcache-root-lock-spike.html">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-brand"><a href="/">Changxi Liu</a></div>
+  <nav class="site-nav">
+    <a href="/">Apps</a>
+    <a href="/blog/" class="active">Blog</a>
+  </nav>
+</header>
+
+<main>
+
+  <article>
+
+    <div class="post-header">
+      <h1>一次 Linux bcache 写入卡顿 1 秒的深度排查 — 从用户感知到 root btree 锁竞争</h1>
+      <div class="post-meta">
+        <span>2026-06-08</span>
+        <span class="dot">·</span>
+        <span>Changxi Liu</span>
+      </div>
+      <div class="post-tags"><span class="tag">linux-kernel</span><span class="tag">bcache</span><span class="tag">ceph</span><span class="tag">bpf</span><span class="tag">rwsem</span><span class="tag">performance</span></div>
+      <div class="accent"></div>
+    </div>
+
+    <div class="post-body">
+<h2>TL;DR</h2>
+<p>线上 Ceph 集群在 bcache + HDD 配置下出现规律性的"客户端写入 1-3 秒级延迟突刺",但仅在<strong>业务空闲一段时间后突发写入</strong>时触发。经过 7 层证据排查(包括 4 次假说证伪),最终定位到 bcache 内核模块中 <strong><code>cache_set-&gt;root</code> btree 节点的 <code>rw_semaphore</code> 锁竞争</strong>,在 <code>__bch_btree_map_nodes</code> 函数 +0x10c 偏移处。<code>rwsem</code> FIFO 公平规则将内部 100-300 ms 的锁等待<strong>放大</strong>为业务可见的秒级 spike。本文记录完整的排查路径、4 个被证伪的假说、以及最终用 BPF/反汇编双重证明的过程。</p>
+<p><strong>关键词</strong>: Linux 内核、bcache、Ceph、rwsem、bpftrace/BCC、root btree contention</p>
+<hr />
+<h2>1. 现场:1 秒卡顿,但只在特定条件下</h2>
+<h3>1.1 架构</h3>
+<ul>
+<li>3 节点 Ceph 集群,每节点 14 个 OSD</li>
+<li>每个 OSD 后端: <code>bluestore</code> over <code>bcache</code> (writeback 模式)</li>
+<li>bcache cache: NVMe (~1 TB) × 4 / 节点,聚合成 3 个 cache_set</li>
+<li>bcache backing: HDD (~12 TB) × 14 / 节点</li>
+<li>客户端通过 cephfs (juicefs gateway) 访问</li>
+</ul>
+<h3>1.2 现象</h3>
+<pre><code>juicefs stats:
+  commit_lat 通常 1-10 ms
+  → 偶发跳到 50-1000 ms (spike)
+  → 持续 1-3 秒
+  → 自愈, 回到 1-10 ms
+</code></pre>
+<p><strong>关键触发条件</strong>: 业务空闲一段时间后,客户端突发 <code>dd</code> 大文件,前 2 秒 100% 触发。<strong>持续 IO 反而不卡</strong>。</p>
+<p>这个"先空闲再突发才卡"的模式,后来证明是定位根因的关键线索。</p>
+<hr />
+<h2>2. 第一轮排除:常见 Ceph 高延迟原因</h2>
+<p>任何 Ceph 性能问题先排除 5 大常见原因:</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>原因</th>
+<th>怎么排除</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>scrub</code> / <code>deep-scrub</code></td>
+<td><code>ceph -s</code> 检查活跃 scrub PG;spike 时段无 scrub</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>recovery</code> / <code>backfill</code></td>
+<td><code>ceph -s</code> 检查 <code>recovering</code>;spike 时段集群健康</td>
+</tr>
+<tr>
+<td>3</td>
+<td>HDD 高延迟</td>
+<td><code>iostat -xm 1</code> spike 时 HDD <code>%util=0</code>,完全空闲</td>
+</tr>
+<tr>
+<td>4</td>
+<td>rocksdb compact</td>
+<td>OSD <code>perf dump</code>: <code>kv_sync_lat / commit_lat &lt; 5%</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>bcache 设计</strong></td>
+<td>OSD <code>perf dump</code>: <strong><code>state_aio_wait_lat / commit_lat = 96%+</code></strong> ← 命中</td>
+</tr>
+</tbody>
+</table>
+<p>第 5 条命中,缩小到 BLOCK 层(NVMe→bcache→HDD)。</p>
+<h3>2.1 第一个奇怪现象</h3>
+<p>spike 时 <code>iostat</code>:
+- <code>bcache0</code> 等设备: <code>%util=100%</code>, 但 <code>aqu-sz=0</code>, <code>wMB/s=0</code>, <code>w_await=0</code>
+- NVMe 设备: <code>%util=0</code>
+- HDD 设备: <code>%util=0</code></p>
+<p><strong>bcache 在"忙"但什么 IO 也没下发</strong>。这是经典的"bio 进了 bcache 内部但被某个软件层卡住"的特征。</p>
+<hr />
+<h2>3. 第二轮:抓 D-state 任务的内核栈</h2>
+<p>写一个简单的 <code>/proc/&lt;tid&gt;/stack</code> 高频采样器,在 spike 期间抓 D-state 任务:</p>
+<pre><code>==== dstate_140000_w57_n81.log (实际抓到 81 个栈) ====
+57  comm=tp_osd_tp       top=cached_dev_make_request   ← Ceph OSD 写者
+3   comm=bcache_writebac top=bch_writeback_thread       ← bcache 写回 kthread
+1   comm=kworker         top=__bch_btree_map_nodes      ← btree 操作
+其他: node_exporter 等 (sysfs reader, 是噪声)
+</code></pre>
+<p><strong>70% 的 D-state 任务是 <code>tp_osd_tp</code>,栈顶 <code>cached_dev_make_request+0x3e0</code></strong>。</p>
+<h3>3.1 反汇编锁定 +0x3e0 的具体位置</h3>
+<pre><code class="language-bash">KO=/lib/modules/$(uname -r)/kernel/drivers/md/bcache/bcache.ko
+objdump -d $KO | grep -A 50 '&lt;cached_dev_make_request&gt;'
+</code></pre>
+<p>找到 <code>+0x3e0</code> 那一行:</p>
+<pre><code class="language-asm">14bb4: bl  &lt;down_read&gt;              ← 调用 down_read
+14bb8: ldr ...                       ← +0x3e0 (down_read 返回点)
+</code></pre>
+<p>→ <strong><code>+0x3e0</code> 是 <code>down_read(&amp;dc-&gt;writeback_lock)</code> 调用的返回点</strong>。</p>
+<p>写者卡在 bcache 的 <code>writeback_lock</code> (per cached_dev rw_semaphore) 上。</p>
+<h3>3.2 假说 1: writeback_lock 直接竞争</h3>
+<p>最直接的假说: writers 在 <code>writeback_lock</code> 上排队。但谁在 writer 那一边?</p>
+<p>bcache 源码中只有 <code>bch_writeback_thread</code>(后台写回 kthread)会 <code>down_write(&amp;dc-&gt;writeback_lock)</code>,做 refill_dirty。</p>
+<p><strong>机制猜测</strong>: rwsem 的 FIFO 公平规则。一旦 writer 排队,后续 reader 也必须排队(防止 writer 饿死)。这把 writer 持锁几十毫秒的窗口,放大成业务 1+ 秒 spike。</p>
+<p>这个假说<strong>部分正确</strong>(后面证实是放大器),但不是根因,因为:<strong>writers 持锁的真正源头是什么?</strong></p>
+<hr />
+<h2>4. 第三轮:用 BPF 精确测锁延迟</h2>
+<p><code>/proc/stack</code> 采样有局限:
+- 采样间隔 100ms,短锁竞争错过
+- 只能看"卡时的快照",不能量化"卡多久"</p>
+<p>升级到 BPF。环境是 OpenEuler 20.03 LTS 内核 4.19.90,没有 <code>bpftrace</code> 包(只能从源码编译),但有 <code>bcc-tools</code>。<code>bpfcc</code> 模块名跟 <code>bcc</code> 不同,要做兼容。</p>
+<h3>4.1 funclatency: rwsem 慢路径直方图</h3>
+<pre><code class="language-bash">sudo /usr/share/bcc/tools/funclatency -m 'rwsem_down_read_failed'
+</code></pre>
+<p>结果(60 秒采样):</p>
+<pre><code>msecs               : count    distribution
+   0 -&gt; 1           : 1410    |****************************************|
+   2 -&gt; 3           : 221     |******                                  |
+   4 -&gt; 7           : 433     |************                            |
+   8 -&gt; 15          : 545     |***************                         |
+  16 -&gt; 31          : 88      |**                                      |
+  32 -&gt; 63          : 5       |                                        |
+  64 -&gt; 127         : 260     |*******                                 |
+ 128 -&gt; 255         : 109     |***                                     |
+ 256 -&gt; 511         : 0       |                                        |
+ 512 -&gt; 1023        : 3       |                                        |
+1024 -&gt; 2047        : 42      |*                                       |  ← 1-2 秒
+2048 -&gt; 4095        : 11      |                                        |  ← 2-4 秒
+</code></pre>
+<p><strong>双峰分布</strong>:
+- 0-16 ms:正常或轻微竞争 (~2600 次)
+- <strong>1-4 秒</strong>:53 次极端 spike</p>
+<p>53 次锁等待超过 1 秒,完美对应业务感知的"1-2 秒卡顿"。</p>
+<h3>4.2 funcslower: 抓完整栈</h3>
+<pre><code class="language-bash">sudo /usr/share/bcc/tools/funcslower -m 50 -K 'rwsem_down_read_failed'
+</code></pre>
+<p>抓到 194 个 spike 事件(60 秒内,集中在 3 秒爆发):</p>
+<pre><code>==== [11:41:08] event ====
+  comm     : tp_osd_tp
+  pid/tid  : 980986/981104
+  latency  : 1482 ms
+  lock     : 0xffff80464a160d18
+  kstack   :
+    rwsem_down_read_failed
+    cached_dev_make_request+0x3e0     ← 跟 /proc/stack 一致
+    generic_make_request+0x17c
+    submit_bio+0x5c
+    blkdev_direct_IO+0x3b0
+    aio_write+0xec
+    __arm64_sys_io_submit+0xb4
+    el0_svc+0x8
+
+==== [11:41:08] event ====
+  comm     : kworker/9:65
+  pid/tid  : 256329/256329
+  latency  : 307 ms
+  lock     : 0xffff8052b466a860   ← ★ 不同的锁地址!
+  kstack   :
+    rwsem_down_read_failed
+    __bch_btree_map_nodes+0x10c   ← ★ 另一个函数
+    bch_btree_insert+0xe8
+    bch_data_insert_keys+0xd0
+    process_one_work+0x1b4
+    worker_thread+0x54
+</code></pre>
+<p><strong>关键发现</strong>: 锁竞争发生在<strong>两个不同的位置</strong>:
+1. <code>tp_osd_tp</code> 在 <code>cached_dev_make_request+0x3e0</code> (writeback_lock)
+2. <code>kworker</code> 在 <code>__bch_btree_map_nodes+0x10c</code> (另一把 rwsem)</p>
+<p>锁地址也分两类:
+- 14 个 <code>*d18</code> 结尾的地址 → 看起来 per-device,可能就是 14 个 cached_dev 的 writeback_lock
+- <strong>2 个 <code>*860</code> 结尾的地址</strong> → 只有 2 个,但占总事件数 67%</p>
+<h3>4.3 假说 2: btree cache miss</h3>
+<p>锁竞争为什么这么长?第一个直觉假说: <strong>btree node cache miss</strong>。bcache 的 btree 节点(每个 256 KB)在内存中有一个 LRU cache(<code>btree_cache_size</code>)。统计:</p>
+<pre><code>btree 总节点数: ~34000 / cache_set × 3 cache_set = ~100k 节点
+全装内存需要: 34000 × 256 KB = 8.6 GB / cache_set
+实际 btree_cache_size: 8.0 GB / cache_set
+                       ↑
+                  缺 5%, 必然有 LRU 替换
+</code></pre>
+<p>业务空闲后,btree node 被 LRU 替换出去。突发时第一波访问 miss → 同步从 NVMe 读 256 KB → 持锁数百毫秒 → spike。</p>
+<p><strong>这是个漂亮的理论</strong>。怎么证明?</p>
+<p>写一个 BPF 跟踪器,hook <code>bch_btree_node_read</code>(只在 cache miss 时被调用):</p>
+<pre><code class="language-python"># btree_miss_tracker.py - 跟踪 bcache 关键函数
+# - bch_btree_node_get  每次访问 (hit + miss)
+# - bch_btree_node_read 仅 cache miss 时调用
+</code></pre>
+<p>跑 60 秒,期间高负载:</p>
+<pre><code>ts          get/s    miss/s   alloc/s   hit_rate
+15:09:12   13396.3      0.0       0.4    100.00%
+15:09:17   13223.2      0.0       6.4    100.00%
+15:09:22   13902.5      0.0       6.4    100.00%
+
+总 btree 访问 (get):    282904
+总 cache miss (read):       0
+命中率:                100.00%
+</code></pre>
+<p><strong>282,904 次 btree 访问,0 次 cache miss</strong>。</p>
+<p><strong>假说 2 推翻</strong> ❌。btree 节点全部在内存里,根本不读 NVMe。</p>
+<p>这是个重要的科学时刻:<strong>用实测推翻自己的假说</strong>,虽然遗憾,但更接近真相。</p>
+<hr />
+<h2>5. 第四轮:Root 锁竞争假说</h2>
+<p>如果 btree 全 hit,那锁等待是什么?重新审视数据:</p>
+<ul>
+<li>60 秒内 67% 的锁等待事件集中在 <strong>2 个 lock 地址</strong></li>
+<li>而 btree 共有 100k+ 个节点,每节点一把锁</li>
+<li>只有 2 个热点 = 这 2 把锁是<strong>全局共享的</strong></li>
+</ul>
+<p>bcache 中"全局共享的 btree node 锁"只能是<strong>每个 cache_set 的 root btree node 锁</strong>。3 个 cache_set 应该有 3 个 root,但只看到 2 个 hot —— 可能 spike 时第 3 个不忙。</p>
+<h3>5.1 看 bcache 源码</h3>
+<pre><code class="language-c">// btree.h - bcache_btree_root 宏 (我们之前没注意到)
+#define bcache_btree_root(fn, c, op, ...) ({                          \
+    int _r = -EINTR;                                                  \
+    do {                                                              \
+        struct btree *_b = (c)-&gt;root;        /* ← 直接取 c-&gt;root */ \
+        bool _w = insert_lock(op, _b);                                \
+        rw_lock(_w, _b, _b-&gt;level);          /* ← ★ 锁 root */      \
+        if (_b == (c)-&gt;root &amp;&amp; _w == insert_lock(op, _b)) {           \
+            _r = bch_btree_ ## fn(_b, op, ##__VA_ARGS__);             \
+        }                                                              \
+        rw_unlock(_w, _b);                                            \
+        ...                                                            \
+    } while (_r == -EINTR);                                           \
+    _r;                                                                \
+})
+</code></pre>
+<p><code>__bch_btree_map_nodes</code> 函数(我们看到的 spike 栈)调用 <code>bcache_btree_root</code>,<strong>第一步就是锁 root</strong>。每个 btree 写入(包括 <code>bch_btree_insert</code>)都从这里开始。</p>
+<p>70 个并发写者 → 都要先过 root 锁 → 队列瞬间深 → spike。</p>
+<h3>5.2 反汇编 <code>__bch_btree_map_nodes+0x10c</code></h3>
+<pre><code class="language-bash">objdump -d $KO | grep -A 200 '&lt;__bch_btree_map_nodes&gt;:'
+</code></pre>
+<p>定位到 <code>+0x10c</code>:</p>
+<pre><code class="language-asm">b5b0: &lt;__bch_btree_map_nodes&gt;:                  ← 函数起始
+b5e8: add  x22, x1, #0x8, lsl #12               ; x22 = c + 0x8000
+b600: ldr  x19, [x22, #20072]                    ; x19 = *(c + 0xCE68) = c-&gt;root
+b608: add  x25, x19, #0x60                       ; x25 = &amp;root-&gt;lock
+b614: mov  x0, x25                                ; x0 = &amp;root-&gt;lock
+b618: b.gt b6b8                                   ; 判断 read 还是 write
+b61c: bl   &lt;down_write&gt;                          ; +0x6c 写锁
+...
+b6b8: bl   &lt;down_read&gt;                           ; +0x108 读锁
+b6bc: ldr  x0, [x22, #20072]                     ; +0x10c (down_read 返回点)
+</code></pre>
+<p><strong><code>+0x10c</code> 就是 <code>down_read(&amp;root-&gt;lock)</code> 的返回点</strong>。栈里看到这个偏移,意味着线程当前在 <code>down_read</code> 内部 schedule。</p>
+<p><code>x19</code> 是 <code>c-&gt;root</code> (cache_set 的 root btree 节点),<code>x25</code> 是 <code>&amp;root-&gt;lock</code>。</p>
+<h3>5.3 双重证明:bpf 验证</h3>
+<p>写两个独立的 BPF 验证脚本:</p>
+<p><strong>方法 1: 排除法</strong></p>
+<p>跟踪 <code>bch_btree_node_get</code> (用于访问<strong>子节点</strong>) 的所有返回值,计算它返回过的所有 btree node 的 <code>&amp;b-&gt;lock</code> 地址。如果热点地址 <code>0xffff8052b466a860</code> 不在这个集合里,说明它不是子节点锁 → 必然是 root 锁。</p>
+<p><strong>方法 2: 直接读 c-&gt;root</strong></p>
+<p>Hook <code>__bch_btree_map_nodes</code> 入口,第二个参数是 <code>cache_set *c</code>。通过 <code>bpf_probe_read_kernel(&amp;root, c + 0xCE68)</code> 直接读 <code>c-&gt;root</code> 指针,计算 <code>&amp;root-&gt;lock = root + 0x60</code>,看是否匹配热点地址。</p>
+<pre><code>方法 1: 排除法
+  经过 bch_btree_node_get 的子节点 lock 共 10240 个
+
+  对比:
+    0xffff8052b466a860  ← ✓ 不在子节点集合 → 必然 root
+    0xffffa057687eb860  ← ✓ 不在子节点集合 → 必然 root
+
+方法 2: 直接读 c-&gt;root
+  读到 3 个 root lock 地址:
+    0xffff804880f93c60  访问 34289 次  (cache_set A, 没卡)
+    0xffffa057687eb860  访问 26148 次  (cache_set B) ★ MATCH
+    0xffff8052b466a860  访问 23959 次  (cache_set C) ★ MATCH
+
+✓ 双重证明: 这两个 hot 地址就是 ROOT btree node 锁
+</code></pre>
+<p><strong>两种独立方法、不同途径、同一结论</strong>。这是教科书级别的内核 debug 证明。</p>
+<h3>5.4 有趣观察:<strong>最忙的 cache_set 反而不卡</strong></h3>
+<p><code>cache_set A</code> 的 root 被访问 34289 次,比 B/C 都多,<strong>但没出现在 spike 锁竞争中</strong>。这告诉我们:</p>
+<blockquote>
+<p>spike 不取决于"绝对访问量",而是"瞬时到达率 + 触发条件"</p>
+</blockquote>
+<p>cache_set A 可能访问分散在时间上;B/C 在 dd 突发时被瞬间集中冲击。</p>
+<hr />
+<h2>6. 但等等 — 为什么是"间歇 spike"不是"持续慢"?</h2>
+<p>如果纯粹是 root 锁竞争,<strong>持续负载下也该一直慢</strong>。但实测是:</p>
+<pre><code>持续负载    → 不卡
+空闲后突发  → 1-3 秒 spike
+</code></pre>
+<p>只用"root 锁"不能解释这个<strong>时间模式</strong>。需要叠加其他因素。</p>
+<h3>6.1 真正的多因素模型</h3>
+<pre><code>&quot;突发 spike&quot; = 4 个易爆因素同时点燃
+
+  因素 A (固有):
+    bcache 中心化设计 → 每 cache_set 1 个 root → 高并发集中点
+
+  因素 B (idle 触发):
+    业务空闲后 writeback_thread 进入 sleep (dirty=0 → 没活干)
+    → 突发时, 它被唤醒, 立刻想 down_write(writeback_lock)
+    → ★ 触发 rwsem FIFO 公平规则
+    → 后续 reader (tp_osd_tp) 全部排队
+
+  因素 C (突发到达):
+    dd 8 GB 一瞬间提交
+    → ceph 三副本分发 → N 节点 × M 线程 = 70 个并发 writer
+    → 同一瞬间冲 root 锁
+    → ★ 队列深度瞬间从 0 涨到 70
+
+  因素 D (放大):
+    cached_dev-&gt;writeback_lock 上的 FIFO 二次放大
+    把 root 锁内部 100-300 ms 的等待
+    放大到 cached_dev_make_request 上的 1-3 秒等待
+    → 业务可见
+
+  → 4 个因素叠加 → spike
+
+持续负载下:
+  B 不成立 (writeback 一直工作不 sleep)
+  C 不成立 (到达率均匀, 队列稳态短)
+  → 只有 A + 弱 D, 业务无感
+</code></pre>
+<h3>6.2 这解释了所有反直觉现象</h3>
+<table>
+<thead>
+<tr>
+<th>反直觉现象</th>
+<th>解释</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>持续 IO 不卡, 空闲后才卡</td>
+<td>B+C 只在 idle→burst 转换时同时成立</td>
+</tr>
+<tr>
+<td>最忙的 cache_set 反而不卡</td>
+<td>它的访问分散, C 不成立</td>
+</tr>
+<tr>
+<td>btree cache miss = 0</td>
+<td>节点都在内存, 不是 IO 慢</td>
+</tr>
+<tr>
+<td>子节点锁全程快</td>
+<td>没人在子节点上集中</td>
+</tr>
+<tr>
+<td>锁等待 1-3 秒,但单次操作微秒级</td>
+<td>rwsem FIFO + writeback_lock 二次放大</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>7. 完整因果链</h2>
+<pre><code>[T = -∞ ~ 0]  系统空闲, 4 个易爆因素已就位:
+  · writeback_thread sleep
+  · root 锁空闲 (无 writer 排队)
+  · closure 队列空
+  · cached_dev 上的 writeback_lock 完全空闲
+
+[T = 0]  客户端 dd 8 GB 突发
+
+[T = 0+1ms]  Ceph 把数据切片三副本, 70 个 tp_osd_tp 并发 io_submit
+  → 70 个 cached_dev_make_request 几乎同时
+  → 70 个 down_read(writeback_lock) 都成功 (rwsem 允许并发 reader)
+  → 启动 70 个 closure 进 bcache_writeback_wq
+
+[T = 0+5ms]  70 个 kworker 同时跑 bch_data_insert chain
+  → 都调到 __bch_btree_map_nodes
+  → 第一件事: down_read(root-&gt;lock)
+  → ★ 70 个 reader 抢同一把 root 锁
+  → 第一个拿到的开始 btree insert; 其他 69 个排队等
+
+[T = 0+50ms]  某个 closure 触发 btree node split, 需要 down_write(root)
+  → root 锁进入 write 模式
+  → rwsem FIFO 触发: 新来的 reader 也排队
+
+[T = 0+100ms]  与此同时, dirty 增长激增, writeback_thread 醒来
+  → 它要 down_write(writeback_lock)
+  → 它发现持锁的 reader 太多, 排队等
+  → ★ writeback_lock 的 FIFO 触发
+  → 新来的 tp_osd_tp 想 down_read(writeback_lock) 也排队
+
+[T = 0+100ms ~ 0+2s]  双重 FIFO 阻塞
+  → kworker 卡在 root-&gt;lock
+  → tp_osd_tp 卡在 writeback_lock
+  → 业务看到 cached_dev_make_request 1-2 秒返回
+
+[T = 0+1.5s ~ 0+3s]  锁链逐层释放
+  → btree insert 完成, root 锁释放
+  → kworker 完成 closure, 释放 writeback_lock 读锁
+  → writeback_thread 拿到 write 锁, 做完 refill, 释放
+  → 排队的 tp_osd_tp 一拥而上拿读锁
+  → 业务恢复
+
+[T &gt; 0+3s]  进入稳态
+  → writeback_thread 持续工作不再 sleep
+  → btree 一直 hot
+  → closure 队列稳定
+  → spike 消失
+
+[T &gt; 0+N 秒, 业务停]
+  → 等待 idle, 4 个易爆因素重新就位
+  → 下次突发再 spike
+</code></pre>
+<hr />
+<h2>8. 修复方案对比</h2>
+<p>测试了 4 个 sysfs 可调参数方案,通过 A/B 多 phase 自动化测试验证:</p>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>攻击的因素</th>
+<th>spike 效果</th>
+<th>副作用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>cache_mode=writethrough</code></td>
+<td>完全绕开 bcache 写路径</td>
+<td>✅ spike 消失</td>
+<td>稳态写延迟从 5ms 涨到 50-150ms (HDD 透传)</td>
+</tr>
+<tr>
+<td><code>writeback_running=0</code></td>
+<td>干掉 writeback_thread (因素 B)</td>
+<td>✅ spike 消失</td>
+<td>dirty 永远不冲洗,几小时内 cache 写满</td>
+</tr>
+<tr>
+<td><code>wb_aggressive</code> (调高 writeback rate)</td>
+<td>让 writeback 持续工作不 sleep</td>
+<td>✅ spike 大幅减少</td>
+<td>持续负载下 HDD 一直忙,平均延迟 +80%</td>
+</tr>
+<tr>
+<td>默认 (基线)</td>
+<td>—</td>
+<td>❌ 持续 spike</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p><strong>没有银弹方案</strong>。每个都有 trade-off。</p>
+<h3>8.1 wb_aggressive 详细配置</h3>
+<pre><code class="language-bash"># 三个参数同时调 (per cached_dev)
+echo 1     &gt; /sys/block/bcacheN/bcache/writeback_percent          # 默认 10
+echo 40960 &gt; /sys/block/bcacheN/bcache/writeback_rate_minimum     # 默认 8 (扇区/秒)
+echo 1     &gt; /sys/block/bcacheN/bcache/writeback_rate_update_seconds  # 默认 5
+</code></pre>
+<p><strong>原理</strong>: 让 writeback_thread 持续以 20 MB/s+ 的速率工作(默认是 4 KB/s),不再有"sleep 唤醒"瞬态,因素 B 被消除。</p>
+<p><strong>适用场景</strong>: 业务模式是"间歇突发"(典型 OLTP / VM IO / 测试环境 dd)
+<strong>不适用</strong>: 持续高吞吐量写(SSD 写入量增加 + HDD 持续繁忙)</p>
+<h3>8.2 长期方案</h3>
+<p><code>bucket_size</code> 升级到 2-4 MB(默认 512 KB)。代价: 需要重做 bcache 设备(线下数据迁移)。收益:
+- btree 节点数减少 4-8 倍 → 全装内存,btree 全 hot
+- 根本上减少 root 锁竞争(更少 split,更短走树深度)
+- 但需要在硬件 / 部署阶段决定</p>
+<hr />
+<h2>9. 排查方法论的反思</h2>
+<h3>9.1 关键工具链</h3>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>工具</th>
+<th>收获</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>初步定位</td>
+<td><code>iostat</code>, <code>ceph -s</code>, OSD perf dump</td>
+<td>排除 5 大常见原因</td>
+</tr>
+<tr>
+<td>栈采样</td>
+<td><code>/proc/&lt;tid&gt;/stack</code> 高频读</td>
+<td>找到 D-state 任务和函数偏移</td>
+</tr>
+<tr>
+<td>反汇编</td>
+<td><code>objdump -d bcache.ko</code></td>
+<td>把 <code>+0x3e0</code> <code>+0x10c</code> 翻译成具体函数调用</td>
+</tr>
+<tr>
+<td>锁延迟量化</td>
+<td><code>bcc-tools funclatency</code></td>
+<td>直方图证明 1-2 秒锁等待</td>
+</tr>
+<tr>
+<td>慢路径栈</td>
+<td><code>bcc-tools funcslower -K</code></td>
+<td>抓到锁等 + 栈 双重证据</td>
+</tr>
+<tr>
+<td>自定义 BPF</td>
+<td>Python + BCC API</td>
+<td>假说证伪 (cache miss=0) 和定向验证 (root 锁)</td>
+</tr>
+<tr>
+<td>A/B 验证</td>
+<td>自动化 sysfs A/B 测试脚本</td>
+<td>修复方案效果量化</td>
+</tr>
+</tbody>
+</table>
+<h3>9.2 4 个被证伪的假说(科学方法的体现)</h3>
+<pre><code>假说 1: writeback_lock 直接竞争
+  → 部分对, 但只是表象 (放大器)
+
+假说 2: btree cache miss
+  → 推翻 (miss=0)
+
+假说 3: 一般的 btree node 锁竞争 (任何节点都可能)
+  → 推翻 (子节点全程 1-2 μs)
+
+假说 4: root btree node 锁竞争 (本质根因)
+  → 双重证明成立
+</code></pre>
+<p><strong>好的内核 debug 不是一次猜中</strong>,而是不断证伪、修正、再证伪,直到剩下唯一可能并独立验证。</p>
+<h3>9.3 给类似问题的方法学建议</h3>
+<ol>
+<li><strong>先排除显而易见的</strong> — Ceph 5 大原因,通常占 80% 案例</li>
+<li><strong>OSD perf 拆解 commit_lat</strong> — aio_wait 占比是关键判分</li>
+<li><strong>不要相信猜测,要写脚本验证</strong> — 假说 2 (cache miss) 被 BPF 数据击穿</li>
+<li><strong>反汇编是终极仲裁</strong> — <code>+0x3e0</code> 这种相对偏移,只有反汇编能告诉你它是哪个 <code>bl &lt;fn&gt;</code> 的返回点</li>
+<li><strong>多路径独立验证</strong> — 排除法 + 直接读两种方法独立得到同一结论,这是铁证</li>
+<li><strong>关注"时间模式"</strong> — "持续不卡只在突发卡" 这个观察排除了纯静态锁竞争假说,迫使我们找触发因素</li>
+<li><strong>接受没有银弹</strong> — 每个修复都有 trade-off,要根据真实业务选</li>
+</ol>
+<hr />
+<h2>10. 给 bcache upstream 的建议</h2>
+<p>这个 case 实际上是 <strong>bcache 设计上的固有限制</strong>:</p>
+<ol>
+<li><strong>中心化 btree</strong>: 每 cache_set 单 btree、单 root → 高并发下必然有 root contention</li>
+<li><strong>rwsem FIFO 公平</strong>: 跟 bcache 的"closure 异步链 + 跨线程持锁"模式不友好</li>
+<li><strong>writeback rate 默认值过低</strong>: <code>writeback_rate_minimum=8</code> (= 4 KB/s) 实际上是"基本不工作",rely on PID ramp,但 PID 反应慢</li>
+</ol>
+<p>可能的内核改进方向:
+- root 锁 → 用 <code>seqlock</code> 或 RCU(reader 不阻塞 writer 排队)
+- closure 链不跨线程持锁 → 改 lock 释放时机
+- writeback 默认值更合理(几 MB/s 而非几 KB/s)</p>
+<p>不过 bcache 已经被 <code>bcachefs</code> (新一代)替代,主线开发不活跃,upstream 修复可能性不高。临时方案就是上面的 sysfs 调参。</p>
+<hr />
+<h2>11. 总结</h2>
+<pre><code>现象:    业务 1-3 秒突刺, 仅在 idle 后突发触发
+根因:    bcache root btree node rwsem 在并发写者下排队 
+        + writeback_lock 的 FIFO 公平规则二次放大
+证据:    
+  · BPF funclatency: 锁等 1-4 秒, 53 次/分钟
+  · BPF funcslower: 194 个 spike 事件, 完整栈含 cached_dev_make_request+0x3e0
+  · 反汇编: 偏移对应 down_read(writeback_lock) 和 down_read(root-&gt;lock)
+  · 排除法 + 直接读 c-&gt;root: 双重证明热点锁就是 root
+  · 证伪假说: btree cache miss=0, 子节点锁全程快
+
+修复:    
+  · 间歇业务: wb_aggressive (调高 writeback rate)
+  · 紧急: writethrough (代价大但稳)
+  · 长期: bucket_size 升级或重新设计 cache 架构
+</code></pre>
+<p>排查过程从最初模糊的"业务慢",到最终精确到具体函数偏移、具体锁对象、具体内核代码行,经过 7 层证据、4 个假说证伪。<strong>这正是内核 debug 的乐趣</strong> — 你以为是网络问题,结果是磁盘;你以为是磁盘问题,结果是锁;你以为是锁,结果是某个 inline 宏 + rwsem FIFO + 业务突发到达的多因素叠加。</p>
+<p>希望这个 case 对类似问题的排查者有帮助。</p>
+<hr />
+<h2>附录 A: 关键 BPF 脚本片段</h2>
+<h3>A.1 排除法证明 root 锁</h3>
+<pre><code class="language-python"># 跟踪 bch_btree_node_get 返回的所有 btree*
+# 计算 &amp;b-&gt;lock = b + 0x60 (offset 来自反汇编)
+# 如果热点地址不在这个集合, 必然是 root
+
+int kretprobe_get(struct pt_regs *ctx) {
+    u64 b = PT_REGS_RC(ctx);
+    if (!b) return 0;
+    u64 lock_addr = b + 0x60;
+    child_locks.update(&amp;lock_addr, ...);
+    return 0;
+}
+</code></pre>
+<h3>A.2 直接读 c-&gt;root</h3>
+<pre><code class="language-python"># Hook __bch_btree_map_nodes(op, c, ...)
+# c 是 arg1, 读 c-&gt;root (offset 0xCE68)
+
+int kprobe_map_nodes(struct pt_regs *ctx) {
+    void *c = (void *)PT_REGS_PARM2(ctx);
+    void *root;
+    bpf_probe_read_kernel(&amp;root, sizeof(root), (char *)c + 0xCE68);
+    u64 root_lock = (u64)root + 0x60;
+    root_locks.update(&amp;root_lock, ...);
+    return 0;
+}
+</code></pre>
+<h2>附录 B: 反汇编关键片段</h2>
+<pre><code class="language-asm">000000000000b5b0 &lt;__bch_btree_map_nodes&gt;:
+    b5b0: stp x29, x30, [sp, #-112]!
+    ...
+    b5d0: mov x21, x1                  ; x21 = cache_set (arg1)
+    b5e8: add x22, x1, #0x8, lsl #12   ; x22 = c + 0x8000
+    b600: ldr x19, [x22, #20072]       ; x19 = c-&gt;root (offset 0xCE68 from c)
+    b608: add x25, x19, #0x60          ; x25 = &amp;root-&gt;lock
+    b60c: ldrb w1, [x19, #194]         ; b-&gt;level
+    b610: cmp w1, w0                   ; level vs op-&gt;lock
+    b614: mov x0, x25                  ; x0 = &amp;root-&gt;lock
+    b618: b.gt b6b8                    ; if level &gt; requested, jump to read
+    b61c: bl &lt;down_write&gt;              ; +0x6c 写锁
+    ...
+    b6b8: bl &lt;down_read&gt;               ; +0x108 读锁
+    b6bc: ldr x0, [x22, #20072]        ; +0x10c (down_read 返回点) ★
+</code></pre>
+<h2>附录 C: 完整因果链时序图</h2>
+<pre><code>T=0    业务突发 (dd 8GB)
+T=0+1  70 个 tp_osd_tp 进 cached_dev_make_request
+T=0+1  70 个 down_read(writeback_lock) 成功 (并发)
+T=0+1  70 个 closure 进 bcache_writeback_wq
+T=0+5  70 个 kworker 跑 __bch_btree_map_nodes
+T=0+5  70 个 down_read(root-&gt;lock) - 第 1 个成功, 其他排队
+T=0+50 第 1 个 closure 完成, 释放 root 锁
+T=0+50 第 2 个 closure 拿 root 锁 (可能是 down_write 做 split)
+T=0+100 dirty 激增, writeback_thread 醒来
+T=0+100 writeback_thread down_write(writeback_lock) - 排队
+T=0+100 ★ rwsem FIFO 触发, 新 down_read 排队
+T=0+1500 ~ T=0+3000  双重 FIFO 阻塞期间
+        - kworker 卡 root-&gt;lock
+        - tp_osd_tp 卡 writeback_lock
+        - 业务感知 1-3 秒 spike
+T=0+3000 锁链释放, 队列清空, spike 平息
+T&gt;0+5s   稳态 (writeback 持续工作), 不再 spike
+</code></pre>
+<hr />
+<p><em>本文基于真实生产案例脱敏整理。所有内核地址 / PID / 进程名为实际数据,无敏感信息。bcache 源码引用基于内核 4.19。</em></p>
+    </div>
+
+  </article>
+
+</main>
+
+<footer class="site-footer">
+  <p>
+    <a href="/blog/">← Back to Blog</a>
+    &nbsp;·&nbsp;
+    <a href="/">Home</a>
+    &nbsp;·&nbsp;
+    Contact: <a href="mailto:liucxer@gmail.com">liucxer@gmail.com</a>
+  </p>
+</footer>
+
+</body>
+</html>

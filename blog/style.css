@@ -1,0 +1,299 @@
+/* blog/style.css - 继承站点风格 + 博客专属样式 (code/table/blockquote) */
+
+:root {
+  --bg: #FBF7EE;
+  --primary: #2A2418;
+  --secondary: #8A8275;
+  --accent: #C9932E;
+  --stroke: #E8E1CF;
+  --code-bg: #F4EFE0;
+  --code-border: #E1D9C2;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font: 16px/1.7 -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background: var(--bg);
+  color: var(--primary);
+  padding: 48px 24px 96px;
+}
+
+main { max-width: 760px; margin: 0 auto; }
+
+/* ===== Site header / nav (跟其他子目录一致) ===== */
+.site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 760px;
+  margin: 0 auto 48px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.site-brand a {
+  font-size: 20px;
+  font-weight: 300;
+  color: var(--primary);
+  text-decoration: none;
+  border-bottom: none;
+  letter-spacing: -0.01em;
+}
+
+.site-nav { display: flex; gap: 24px; font-size: 13px; }
+
+.site-nav a {
+  color: var(--secondary);
+  text-decoration: none;
+  border-bottom: none;
+}
+
+.site-nav a:hover, .site-nav a.active { color: var(--accent); }
+
+/* ===== Article header ===== */
+.post-header { margin-bottom: 40px; }
+
+.post-header h1 {
+  font-size: 36px;
+  font-weight: 200;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  margin-bottom: 16px;
+}
+
+.post-meta {
+  font-size: 13px;
+  color: var(--secondary);
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  margin-bottom: 12px;
+}
+
+.post-meta .dot { margin: 0 8px; opacity: 0.5; }
+
+.post-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+.post-tags .tag {
+  display: inline-block;
+  font-size: 11px;
+  color: var(--secondary);
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+}
+
+.accent {
+  display: inline-block;
+  width: 32px;
+  height: 2px;
+  background: var(--accent);
+  margin: 8px 0 18px;
+}
+
+/* ===== Headings (article body) ===== */
+.post-body h1 {
+  font-size: 28px;
+  font-weight: 300;
+  letter-spacing: -0.01em;
+  margin: 48px 0 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--stroke);
+}
+
+.post-body > h1:first-child {
+  margin-top: 24px;
+  border-top: none;
+  padding-top: 0;
+}
+
+.post-body h2 {
+  font-size: 22px;
+  font-weight: 400;
+  margin: 36px 0 14px;
+  color: var(--primary);
+}
+
+.post-body h3 {
+  font-size: 17px;
+  font-weight: 500;
+  margin: 28px 0 10px;
+  color: var(--primary);
+}
+
+.post-body h4 {
+  font-size: 15px;
+  font-weight: 500;
+  margin: 22px 0 8px;
+  color: var(--primary);
+}
+
+/* ===== Paragraphs ===== */
+.post-body p {
+  margin-bottom: 16px;
+  color: var(--primary);
+  font-weight: 300;
+}
+
+.post-body strong {
+  font-weight: 500;
+  color: var(--primary);
+}
+
+.post-body em { font-style: italic; }
+
+/* ===== Links ===== */
+.post-body a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(201, 147, 46, 0.4);
+  transition: border-color 0.15s;
+}
+
+.post-body a:hover { border-bottom-color: var(--accent); }
+
+/* ===== Lists ===== */
+.post-body ul, .post-body ol { padding-left: 26px; margin-bottom: 16px; }
+.post-body li { margin-bottom: 6px; font-weight: 300; }
+.post-body li > ul, .post-body li > ol { margin-top: 6px; margin-bottom: 6px; }
+
+/* ===== Inline code ===== */
+.post-body code {
+  font-family: "SF Mono", ui-monospace, Menlo, "Cascadia Code", monospace;
+  font-size: 13.5px;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: #6B4F1A;
+}
+
+/* ===== Code blocks (multi-line) ===== */
+.post-body pre {
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 6px;
+  padding: 16px 18px;
+  overflow-x: auto;
+  margin: 16px 0 20px;
+  line-height: 1.5;
+}
+
+.post-body pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  color: var(--primary);
+  white-space: pre;
+  display: block;
+}
+
+/* ===== Tables ===== */
+.post-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 18px 0 22px;
+  font-size: 14px;
+}
+
+.post-body th, .post-body td {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--stroke);
+  font-weight: 300;
+  vertical-align: top;
+}
+
+.post-body th {
+  background: var(--code-bg);
+  color: var(--primary);
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.post-body tr:last-child td { border-bottom: none; }
+
+/* ===== Blockquote ===== */
+.post-body blockquote {
+  border-left: 3px solid var(--accent);
+  padding: 8px 0 8px 20px;
+  margin: 18px 0;
+  color: var(--secondary);
+  font-style: italic;
+}
+
+.post-body blockquote p { color: var(--secondary); }
+
+/* ===== HR ===== */
+.post-body hr {
+  border: none;
+  border-top: 1px solid var(--stroke);
+  margin: 40px 0;
+}
+
+/* ===== Footer ===== */
+.site-footer {
+  max-width: 760px;
+  margin: 80px auto 0;
+  padding-top: 24px;
+  border-top: 1px solid var(--stroke);
+  color: var(--secondary);
+  font-size: 13px;
+  text-align: center;
+}
+
+.site-footer a { color: var(--secondary); border-bottom-color: transparent; }
+.site-footer a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ===== Blog index (列表页) ===== */
+.post-list { list-style: none; padding: 0; }
+
+.post-list li {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--stroke);
+}
+
+.post-list li:last-child { border-bottom: none; }
+
+.post-list h2 {
+  font-size: 19px;
+  font-weight: 400;
+  margin-bottom: 8px;
+}
+
+.post-list h2 a {
+  color: var(--primary);
+  text-decoration: none;
+  border-bottom: none;
+}
+
+.post-list h2 a:hover { color: var(--accent); }
+
+.post-list .post-meta { margin-bottom: 4px; }
+
+.post-list .excerpt {
+  color: var(--secondary);
+  font-size: 14px;
+  font-weight: 300;
+  margin-top: 4px;
+}
+
+/* ===== Mobile ===== */
+@media (max-width: 720px) {
+  body { padding: 32px 16px 64px; }
+  main { max-width: 100%; }
+  .site-header { flex-direction: column; text-align: center; max-width: 100%; }
+  .site-nav { justify-content: center; }
+  .post-header h1 { font-size: 28px; }
+  .post-body h1 { font-size: 24px; }
+  .post-body h2 { font-size: 19px; }
+  .post-body pre { font-size: 12px; padding: 12px 14px; }
+  .post-body table { font-size: 13px; }
+  .post-body th, .post-body td { padding: 8px 10px; }
+}

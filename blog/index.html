@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tech Blog · Changxi Liu</title>
+  <meta name="description" content="Changxi Liu 的技术博客 — Linux 内核、性能排查、分布式系统、独立开发。">
+  <meta property="og:title" content="Tech Blog · Changxi Liu">
+  <meta property="og:url" content="https://liucxer.github.io/blog/">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="site-brand"><a href="/">Changxi Liu</a></div>
+  <nav class="site-nav">
+    <a href="/">Apps</a>
+    <a href="/blog/" class="active">Blog</a>
+  </nav>
+</header>
+
+<main>
+
+  <section>
+    <h2 style="font-size: 32px; font-weight: 200; letter-spacing: -0.02em; margin-bottom: 12px;">Tech Blog</h2>
+    <div class="accent"></div>
+    <p style="color: var(--secondary); font-weight: 300; margin-bottom: 48px;">
+      Kernel debugging · performance analysis · distributed systems · indie dev notes.
+    </p>
+  </section>
+
+  <ul class="post-list">
+
+    <li>
+      <h2><a href="2026-06-08-bcache-root-lock-spike.html">一次 Linux bcache 写入卡顿 1 秒的深度排查 — 从用户感知到 root btree 锁竞争</a></h2>
+      <div class="post-meta">
+        <span>2026-06-08</span>
+        <span class="dot">·</span>
+        <span class="tag">linux-kernel</span>
+        <span class="tag">bcache</span>
+        <span class="tag">ceph</span>
+        <span class="tag">bpf</span>
+        <span class="tag">rwsem</span>
+      </div>
+      <p class="excerpt">
+        线上 Ceph 集群在 bcache + HDD 配置下出现规律性的"客户端写入 1-3 秒级延迟突刺"。经过 7 层证据排查(含 4 次假说证伪),最终定位到 <code>cache_set-&gt;root</code> btree 节点的 <code>rw_semaphore</code> 锁竞争,通过 BPF + 反汇编双重证明。完整记录排查路径与方法论。
+      </p>
+    </li>
+
+  </ul>
+
+</main>
+
+<footer class="site-footer">
+  <p>
+    <a href="/">← Back to Apps</a>
+    &nbsp;·&nbsp;
+    Contact: <a href="mailto:liucxer@gmail.com">liucxer@gmail.com</a>
+    &nbsp;·&nbsp;
+    GitHub: <a href="https://github.com/liucxer">@liucxer</a>
+  </p>
+</footer>
+
+</body>
+</html>
