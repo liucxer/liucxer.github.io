@@ -1,0 +1,154 @@
+:root {
+  --bg: #F4EFE2;
+  --primary: #1A2B3F;
+  --secondary: #5C6D7E;
+  --accent: #B8860B;
+  --stroke: #E8E0CC;
+  --surface: #FFFEF9;
+  --muted: #8B7E6E;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font: 16px/1.65 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background: var(--bg);
+  color: var(--primary);
+  padding: 48px 24px;
+}
+
+main { max-width: 720px; margin: 0 auto; }
+
+.site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 720px;
+  margin: 0 auto 48px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.site-brand a {
+  font-family: Caslon, "Times New Roman", Georgia, serif;
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--primary);
+  text-decoration: none;
+  border-bottom: none;
+  letter-spacing: 0.01em;
+}
+
+.site-nav { display: flex; gap: 24px; font-size: 14px; }
+.site-nav a { color: var(--secondary); text-decoration: none; border-bottom: none; }
+.site-nav a:hover, .site-nav a.active { color: var(--accent); }
+
+.hero { text-align: center; margin-bottom: 64px; }
+.hero h1 {
+  font-family: Caslon, "Times New Roman", Georgia, serif;
+  font-size: 56px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin-bottom: 12px;
+  color: var(--primary);
+}
+.accent { display: inline-block; width: 32px; height: 2px; background: var(--accent); margin: 8px 0 18px; }
+.tagline { font-size: 18px; color: var(--muted); font-weight: 400; }
+.tagline em { font-family: Caslon, serif; font-style: italic; color: var(--accent); }
+
+section { margin-bottom: 48px; }
+h2 {
+  font-family: Caslon, "Times New Roman", Georgia, serif;
+  font-size: 24px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: var(--primary);
+}
+h2 + .accent { margin-bottom: 18px; }
+h3 {
+  font-family: Caslon, "Times New Roman", Georgia, serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--primary);
+  margin-top: 24px;
+  margin-bottom: 6px;
+}
+
+p { margin-bottom: 14px; color: var(--primary); font-weight: 400; }
+p.muted, p em { color: var(--muted); font-style: normal; }
+p em { font-style: italic; }
+
+ul, ol { padding-left: 22px; margin-bottom: 14px; }
+li { margin-bottom: 6px; font-weight: 400; }
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(184, 134, 11, 0.4);
+}
+a:hover { border-bottom-color: var(--accent); }
+
+strong { font-weight: 600; color: var(--primary); }
+code {
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 14px;
+  background: rgba(26, 43, 63, 0.06);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.feature { display: flex; gap: 14px; margin-bottom: 22px; align-items: flex-start; }
+.feature-icon { font-size: 22px; width: 28px; text-align: center; flex-shrink: 0; }
+.feature-text strong { display: block; margin-bottom: 4px; color: var(--primary); font-weight: 600; }
+.feature-text span { color: var(--muted); font-weight: 400; font-size: 14px; }
+
+.price-card {
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 32px 24px;
+  text-align: center;
+  margin: 32px 0 16px;
+}
+.price-card .amount {
+  font-family: Caslon, serif;
+  font-size: 36px;
+  font-weight: 500;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.price-card .label { color: var(--muted); font-size: 13px; }
+
+.quote {
+  font-family: Caslon, "Times New Roman", Georgia, serif;
+  font-style: italic;
+  font-size: 17px;
+  color: var(--primary);
+  border-left: 3px solid var(--accent);
+  padding-left: 18px;
+  margin: 24px 0;
+}
+
+.site-footer {
+  max-width: 720px;
+  margin: 80px auto 0;
+  padding-top: 24px;
+  border-top: 1px solid var(--stroke);
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+.site-footer a { color: var(--muted); border-bottom-color: transparent; }
+.site-footer a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+@media (max-width: 600px) {
+  body { padding: 32px 16px; }
+  .hero h1 { font-size: 40px; }
+  .tagline { font-size: 15px; }
+  .site-header { flex-direction: column; text-align: center; }
+  .site-nav { justify-content: center; }
+}

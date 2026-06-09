@@ -12,6 +12,7 @@ liucxer.github.io/                 → Portfolio homepage (this README's repo ro
 ├── learning-flashcards/           → /learning-flashcards/ (iOS · 中文)
 ├── dingding-logic/                → /dingding-logic/      (iOS · 中文)
 ├── preowned-islands/              → /preowned-islands/    (iOS · 中文)
+├── preowned-islands-intl/         → /preowned-islands-intl/ (iOS · English)
 │   ├── index.html                 → marketing
 │   ├── support.html               → FAQ / support
 │   ├── privacy.html               → privacy policy
@@ -30,6 +31,7 @@ Each app is a **self-contained subdirectory** — its own pages, its own `style.
 | **小豆丁学堂** | https://liucxer.github.io/learning-flashcards/ | iOS · 中文 | 免费 · [App Store](https://apps.apple.com/cn/app/小豆丁学堂/id6762811519) |
 | **小豆丁逻辑课** | https://liucxer.github.io/dingding-logic/ | iOS · 中文 | 免费 · [App Store](https://apps.apple.com/cn/app/小豆丁-逻辑课/id6775833119) |
 | **二手海岛** | https://liucxer.github.io/preowned-islands/ | iOS · 中文 | ¥18 · App Store(审核中) |
+| **PreOwned Islands** | https://liucxer.github.io/preowned-islands-intl/ | iOS · English | $2.99 · App Store (coming soon) |
 
 ## App Store Connect URL fields → repo paths
 
