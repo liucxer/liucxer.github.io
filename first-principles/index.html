@@ -135,14 +135,34 @@
     .progress-bar .fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.35s ease; }
     .swipe-labels { display: flex; justify-content: center; gap: 10px; font-size: 11px; color: #C4C9D4; }
 
-    .chips { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 4px; width: 100%; }
-    .chips button {
-      padding: 6px 12px; border-radius: 20px;
+    .card-pos { cursor: pointer; }
+    .card-pos:hover { color: var(--accent); }
+
+    /* Category picker popover */
+    .picker-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 200;
+      display: flex; align-items: flex-start; justify-content: center;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+    }
+    .picker-overlay.show { opacity: 1; pointer-events: auto; }
+    .picker-sheet {
+      margin-top: 100px;
+      background: var(--surface);
+      border-radius: 20px;
+      padding: 20px;
+      width: 260px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+    }
+    .picker-sheet button {
+      padding: 8px 14px; border-radius: 20px;
       border: 1px solid var(--stroke); background: var(--surface);
-      font-size: 12px; color: var(--secondary); cursor: pointer; white-space: nowrap;
+      font-size: 14px; color: var(--secondary); cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
-    .chips button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .picker-sheet button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
   </style>
 </head>
 <body>
@@ -150,10 +170,8 @@
 <div class="app">
   <div class="app-header">
     <div class="app-title">第一性原理</div>
-    <div class="app-stats"><span class="card-pos">1/10</span></div>
+    <div class="app-stats"><span class="card-pos" id="card-pos">1/10</span></div>
   </div>
-
-  <div class="chips" id="chip-bar"></div>
 
   <div class="card-stack" id="stack">
     <div class="card peek" id="peek-card"></div>
@@ -164,6 +182,10 @@
     <div class="progress-bar"><div class="fill" id="progress-fill"></div></div>
     <div class="swipe-labels">左滑下一张 &middot; 右滑上一张 &middot;  键翻卡</div>
   </div>
+</div>
+
+<div class="picker-overlay" id="picker-overlay">
+  <div class="picker-sheet" id="picker-sheet"></div>
 </div>
 
 <script>
@@ -252,8 +274,9 @@ var stack = document.getElementById("stack");
 var activeCard = document.getElementById("active-card");
 var peekCard = document.getElementById("peek-card");
 var progressFill = document.getElementById("progress-fill");
-var cardPos = document.querySelector(".card-pos");
-var chipBar = document.getElementById("chip-bar");
+var cardPos = document.getElementById("card-pos");
+var pickerOverlay = document.getElementById("picker-overlay");
+var pickerSheet = document.getElementById("picker-sheet");
 
 function buildDeck() {
   var pool = activeFilter === "all" ? ALL_CARDS : ALL_CARDS.filter(function(c) { return c.catKey === activeFilter; });
@@ -338,14 +361,24 @@ function renderChips() {
   CATEGORIES.forEach(function(c) {
     html += '<button class="' + (activeFilter === c.key ? 'on' : '') + '" data-key="' + c.key + '">' + c.label + '</button>';
   });
-  chipBar.innerHTML = html;
-  chipBar.querySelectorAll("button").forEach(function(btn) {
+  pickerSheet.innerHTML = html;
+  pickerSheet.querySelectorAll("button").forEach(function(btn) {
     btn.addEventListener("click", function() {
       activeFilter = btn.dataset.key;
+      pickerOverlay.classList.remove("show");
       resetSession();
     });
   });
 }
+
+cardPos.addEventListener("click", function() {
+  renderChips();
+  pickerOverlay.classList.add("show");
+});
+
+pickerOverlay.addEventListener("click", function(e) {
+  if (e.target === pickerOverlay) pickerOverlay.classList.remove("show");
+});
 
 // ── Gesture ──
 function getPos(e) {
