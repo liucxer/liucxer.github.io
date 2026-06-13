@@ -13,7 +13,6 @@
       --accent-light: #FFF4D6;
       --stroke: #EDE2D0;
       --surface: #FFFFFF;
-      --green: #3F8F2E;
       --gray: #9CA3AF;
       --shadow: 0 8px 32px rgba(0,0,0,0.10);
     }
@@ -54,7 +53,6 @@
     }
     .app-title { font-size: 18px; font-weight: 700; color: var(--primary); }
     .app-stats { font-size: 13px; color: var(--gray); }
-    .app-stats span { color: var(--accent); font-weight: 700; }
 
     .card-stack {
       position: relative;
@@ -125,7 +123,7 @@
     }
     .card-case .case-text { font-size: 14px; color: var(--primary); line-height: 1.55; }
 
-    .card-reflect { padding: 10px 18px 14px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+    .card-reflect { padding: 10px 18px 18px; display: flex; flex-direction: column; gap: 6px; }
     .card-reflect .refl-label {
       font-size: 12px; font-weight: 700; color: var(--secondary);
       letter-spacing: 0.04em; margin-bottom: 2px;
@@ -133,49 +131,10 @@
     .card-reflect .refl-q { font-size: 14px; color: var(--primary); display: flex; gap: 6px; align-items: flex-start; line-height: 1.5; }
     .card-reflect .refl-q .idx { font-weight: 700; color: var(--accent); flex-shrink: 0; }
 
-    .judgment { display: flex; gap: 12px; width: 100%; padding: 0 4px; }
-    .judgment button {
-      flex: 1; padding: 14px 0; border-radius: 16px; border: none;
-      font-size: 16px; font-weight: 600; cursor: pointer;
-      background: var(--surface); color: var(--gray);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-      transition: transform 0.15s, box-shadow 0.15s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .judgment button:active { transform: scale(0.96); }
-    .judgment .btn-got-it { color: var(--green); }
-    .judgment .btn-again  { color: var(--gray); }
-    .judgment button:disabled { opacity: 0.4; pointer-events: none; }
-
     .swipe-hint { width: 100%; padding: 0 8px; display: flex; flex-direction: column; gap: 8px; }
     .progress-bar { width: 100%; height: 5px; background: #E5E7EB; border-radius: 3px; overflow: hidden; }
     .progress-bar .fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.35s ease; }
     .swipe-labels { display: flex; justify-content: center; gap: 10px; font-size: 11px; color: #C4C9D4; }
-
-    .overlay {
-      position: fixed; inset: 0; background: var(--bg);
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 24px; z-index: 100;
-      opacity: 0; pointer-events: none; transition: opacity 0.4s;
-    }
-    .overlay.show { opacity: 1; pointer-events: auto; }
-    .overlay .big-emoji { font-size: 72px; }
-    .overlay h2 { font-size: 28px; font-weight: 800; }
-    .overlay .encourage { font-size: 18px; color: var(--accent); font-weight: 600; }
-    .overlay .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 280px; }
-    .overlay .stat { background: var(--surface); border-radius: 14px; padding: 14px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
-    .overlay .stat .val { font-size: 26px; font-weight: 800; }
-    .overlay .stat .lbl { font-size: 12px; color: var(--secondary); margin-top: 2px; }
-    .overlay .stat .val.green { color: var(--green); }
-    .overlay .stat .val.orange { color: var(--accent); }
-    .overlay .stat .val.gray { color: var(--gray); }
-    .overlay button {
-      width: 260px; padding: 14px; border-radius: 16px; border: none;
-      font-size: 17px; font-weight: 700; cursor: pointer;
-      color: #fff; background: var(--accent);
-      -webkit-tap-highlight-color: transparent;
-    }
-    .overlay button.ghost { background: transparent; color: var(--secondary); font-weight: 500; }
 
     .chips { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 4px; width: 100%; }
     .chips button {
@@ -192,7 +151,7 @@
 <div class="app">
   <div class="app-header">
     <div class="app-title">第一性原理</div>
-    <div class="app-stats"><span class="total-stars">0</span> &nbsp; <span class="card-pos">1/10</span></div>
+    <div class="app-stats"><span class="card-pos">1/10</span></div>
   </div>
 
   <div class="chips" id="chip-bar"></div>
@@ -202,34 +161,13 @@
     <div class="card" id="active-card"></div>
   </div>
 
-  <div class="judgment">
-    <button class="btn-again" id="btn-again">再想想</button>
-    <button class="btn-got-it" id="btn-got-it">已内化</button>
-  </div>
-
   <div class="swipe-hint">
     <div class="progress-bar"><div class="fill" id="progress-fill"></div></div>
-    <div class="swipe-labels"> 左滑下一张 &middot; 右滑上一张 &middot; 键盘 1/2 判分</div>
+    <div class="swipe-labels">左滑下一张 &middot; 右滑上一张 &middot;  键翻卡</div>
   </div>
-</div>
-
-<div class="overlay" id="summary">
-  <div class="big-emoji"></div>
-  <h2>完成啦</h2>
-  <div class="encourage" id="summary-msg"></div>
-  <div class="stat-grid">
-    <div class="stat"><div class="val green" id="sum-correct">0</div><div class="lbl">已内化</div></div>
-    <div class="stat"><div class="val gray" id="sum-wrong">0</div><div class="lbl">再想想</div></div>
-    <div class="stat"><div class="val orange" id="sum-stars">0</div><div class="lbl">获得星星</div></div>
-    <div class="stat"><div class="val" id="sum-accuracy">0%</div><div class="lbl">掌握率</div></div>
-  </div>
-  <button id="btn-restart">再来一组</button>
-  <button class="ghost" id="btn-close">关闭</button>
 </div>
 
 <script>
-// ── Card Data ──
-// Chinese quoted terms use corner brackets 「」 to avoid JS string conflicts.
 var ALL_CARDS = [
   { id: "p01", category: "哲学", catKey: "philosophy", principle: "第一性原理就是看透事物本质的方法", author: "亚里士多德", difficulty: 1,
     breakdown: ["什么是「本质」？它是事物不可再分解的元事实", "如何区分表象与本质？追问「这背后是什么」", "从元事实出发，推导出新的可能性"],
@@ -293,7 +231,6 @@ var ALL_CARDS = [
     prompts: ["你的工作/生活里，正在做多少件「还行」的事？","如果只能留一件，哪一件？为什么它值得？"] }
 ];
 
-// Categories
 var CATEGORIES = [
   { key: "all",       label: "全部" },
   { key: "philosophy", label: "哲学" },
@@ -304,69 +241,41 @@ var CATEGORIES = [
   { key: "systems",    label: "系统" },
 ];
 
-// State
-var STORAGE_KEY = "fp_progress_v1";
-var progress = {};
 var cards = [];
 var currentIndex = 0;
-var sessionCorrect = 0;
-var sessionWrong = 0;
-var sessionStars = 0;
 var activeFilter = "all";
 var isTransitioning = false;
 var dragStart = null;
 var dragOffset = { x: 0, y: 0 };
+var dragLocked = false;
 
-// DOM
 var stack = document.getElementById("stack");
 var activeCard = document.getElementById("active-card");
 var peekCard = document.getElementById("peek-card");
 var progressFill = document.getElementById("progress-fill");
 var cardPos = document.querySelector(".card-pos");
-var totalStarsEl = document.querySelector(".total-stars");
 var chipBar = document.getElementById("chip-bar");
-var summary = document.getElementById("summary");
-var btnAgain = document.getElementById("btn-again");
-var btnGotIt = document.getElementById("btn-got-it");
-var btnRestart = document.getElementById("btn-restart");
-var btnClose = document.getElementById("btn-close");
 
-// Progress
-function loadProgress() {
-  try { var raw = localStorage.getItem(STORAGE_KEY); if (raw) progress = JSON.parse(raw); }
-  catch(e) { progress = {}; }
-}
-function saveProgress() { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); }
-function cp(id) { return progress[id] || { correct: 0, wrong: 0, stars: 0 }; }
-function totalStars() {
-  var s = 0; Object.values(progress).forEach(function(p) { s += p.stars || 0; }); return s;
-}
-
-// Build deck: weighted shuffle by 1/(correct+1)
 function buildDeck() {
   var pool = activeFilter === "all" ? ALL_CARDS : ALL_CARDS.filter(function(c) { return c.catKey === activeFilter; });
-  var keyed = pool.map(function(c) {
-    var w = 1 / (cp(c.id).correct + 1);
-    var u = Math.random() * (1 - 1e-12) + 1e-12;
-    return { card: c, key: -Math.log(u) / w };
-  });
-  keyed.sort(function(a, b) { return a.key - b.key; });
-  return keyed.map(function(k) { return k.card; });
+  // Shuffle
+  var arr = pool.slice();
+  for (var i = arr.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+  }
+  return arr;
 }
 
 function resetSession() {
   cards = buildDeck();
   currentIndex = 0;
   dragOffset = { x: 0, y: 0 };
-  sessionCorrect = 0;
-  sessionWrong = 0;
-  sessionStars = 0;
   isTransitioning = false;
   updateUI();
   renderChips();
 }
 
-// Render
 function renderCard(el, card) {
   if (!card) { el.innerHTML = ""; return; }
   var starsHtml = "";
@@ -381,14 +290,6 @@ function renderCard(el, card) {
     return '<div class="refl-q"><span class="idx">' + (NUMS[i] || (i+1)) + '</span>' + q + '</div>';
   }).join("");
 
-  var cprog = cp(card.id);
-  var badge = "";
-  if (cprog.correct >= 3) {
-    badge = '<span style="background:#2E7D32;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;"> 掌握</span>';
-  } else if (cprog.correct >= 1) {
-    badge = '<span style="background:#fff;color:#2E7D32;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">' + cprog.correct + '</span>';
-  }
-
   var catEmoji = { "哲学":"", "科学":"", "商业":"", "认知":"", "数学":"", "系统":"" }[card.category] || "";
 
   el.innerHTML =
@@ -397,7 +298,6 @@ function renderCard(el, card) {
       '<span class="cat-name">' + card.category + '</span>' +
       '<span class="spacer"></span>' +
       '<span class="stars">' + starsHtml + '</span>' +
-      badge +
     '</div>' +
     '<div class="card-quote">' +
       '<div class="quote-text">' + card.principle + '</div>' +
@@ -423,7 +323,6 @@ function updateUI() {
     peekCard.innerHTML = "";
     progressFill.style.width = "0%";
     cardPos.textContent = "0/0";
-    totalStarsEl.textContent = totalStars();
     return;
   }
   renderCard(activeCard, cards[currentIndex]);
@@ -436,11 +335,9 @@ function updateUI() {
   }
   progressFill.style.width = ((currentIndex + 1) / cards.length * 100) + "%";
   cardPos.textContent = (currentIndex + 1) + "/" + cards.length;
-  totalStarsEl.textContent = totalStars();
   activeCard.style.transform = "translate(" + dragOffset.x + "px, " + dragOffset.y + "px) rotate(" + (dragOffset.x / 24) + "deg)";
 }
 
-// Chips
 function renderChips() {
   var html = "";
   CATEGORIES.forEach(function(c) {
@@ -455,13 +352,11 @@ function renderChips() {
   });
 }
 
-// Gesture
+// ── Gesture ──
 function getPos(e) {
   if (e.touches && e.touches.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
   return { x: e.clientX, y: e.clientY };
 }
-
-var dragLocked = false;  // true once we commit to a horizontal card-drag
 
 function onStart(e) {
   if (isTransitioning || cards.length === 0) return;
@@ -477,16 +372,14 @@ function onMove(e) {
   var dy = p.y - dragStart.y;
 
   if (!dragLocked) {
-    // Commit to horizontal card-drag only when it clearly dominates.
     if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 8) {
       dragLocked = true;
       activeCard.style.transition = "none";
     } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
-      // Vertical scroll — release the gesture so the card can scroll naturally.
       dragStart = null;
       return;
     } else {
-      return;  // still ambiguous, wait
+      return;
     }
   }
 
@@ -499,7 +392,6 @@ function onMove(e) {
 function onEnd(e) {
   if (!dragStart) return;
   if (!dragLocked) {
-    // Never committed to a horizontal drag — just reset.
     dragOffset.x = 0; dragOffset.y = 0;
     activeCard.style.transition = "transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1)";
     activeCard.style.transform = "translate(0, 0) rotate(0deg)";
@@ -544,21 +436,17 @@ window.addEventListener("touchmove", function(e) { if (dragStart) onMove(e); }, 
 window.addEventListener("mouseup", onEnd);
 window.addEventListener("touchend", onEnd);
 
-// Animation
-function animatePageTurn(toIndex, exitX, exitY, isForward) {
+// ── Animation ──
+function animatePageTurn(toIndex, exitX, exitY, goingForward) {
   isTransitioning = true;
-  btnAgain.disabled = true;
-  btnGotIt.disabled = true;
   peekCard.style.display = "none";
 
-  // Phase 1: fly out
   dragOffset.x = exitX;
   dragOffset.y = exitY;
   activeCard.style.transition = "transform 0.22s ease-out";
   activeCard.style.transform = "translate(" + exitX + "px, " + exitY + "px) rotate(" + (exitX / 24) + "deg)";
 
   setTimeout(function() {
-    // Phase 2: swap index, jump to opposite side
     currentIndex = toIndex;
     var enterX = -exitX;
     var enterY = -exitY;
@@ -567,10 +455,8 @@ function animatePageTurn(toIndex, exitX, exitY, isForward) {
     activeCard.style.transition = "none";
     activeCard.style.transform = "translate(" + enterX + "px, " + enterY + "px) rotate(" + (enterX / 24) + "deg)";
 
-    // Force reflow
     activeCard.offsetHeight;
 
-    // Phase 3: spring in
     requestAnimationFrame(function() {
       renderCard(activeCard, cards[currentIndex]);
       dragOffset.x = 0;
@@ -583,70 +469,12 @@ function animatePageTurn(toIndex, exitX, exitY, isForward) {
 
     setTimeout(function() {
       isTransitioning = false;
-      btnAgain.disabled = false;
-      btnGotIt.disabled = false;
       updateUI();
     }, 450);
   }, 230);
 }
 
-// Buttons
-function handleMark(correct) {
-  if (isTransitioning || cards.length === 0) return;
-  var card = cards[currentIndex];
-  var cprog = cp(card.id);
-  if (correct) {
-    cprog.correct = (cprog.correct || 0) + 1;
-    cprog.stars = (cprog.stars || 0) + card.difficulty;
-    sessionCorrect++;
-    sessionStars += card.difficulty;
-  } else {
-    cprog.wrong = (cprog.wrong || 0) + 1;
-    sessionWrong++;
-  }
-  progress[card.id] = cprog;
-  saveProgress();
-
-  if (currentIndex >= cards.length - 1) {
-    updateUI();
-    showSummary();
-  } else {
-    var fly = Math.max(stack.getBoundingClientRect().width || 400, 500);
-    animatePageTurn(currentIndex + 1, -fly, 0, true);
-  }
-}
-
-btnGotIt.addEventListener("click", function() { handleMark(true); });
-btnAgain.addEventListener("click", function() { handleMark(false); });
-
-// Summary
-function showSummary() {
-  var total = sessionCorrect + sessionWrong;
-  var acc = total > 0 ? Math.round(sessionCorrect / total * 100) : 0;
-  var msg = "继续加油";
-  if (acc >= 90) msg = "太棒了你正在建立第一性思维";
-  else if (acc >= 70) msg = "干得不错继续内化这些原理";
-  else if (acc >= 50) msg = "有进步这些概念需要反复咀嚼";
-
-  document.getElementById("sum-correct").textContent = sessionCorrect;
-  document.getElementById("sum-wrong").textContent = sessionWrong;
-  document.getElementById("sum-stars").textContent = sessionStars;
-  document.getElementById("sum-accuracy").textContent = acc + "%";
-  document.getElementById("summary-msg").textContent = msg;
-  summary.classList.add("show");
-}
-
-btnRestart.addEventListener("click", function() {
-  summary.classList.remove("show");
-  resetSession();
-});
-
-btnClose.addEventListener("click", function() {
-  summary.classList.remove("show");
-  resetSession();
-});
-
-// Keyboard
+// ── Keyboard ──
 window.addEventListener("keydown", function(e) {
   if (e.key === "ArrowLeft") {
     e.preventDefault();
@@ -660,15 +488,9 @@ window.addEventListener("keydown", function(e) {
       var fly = Math.max(stack.getBoundingClientRect().width || 400, 500);
       animatePageTurn(currentIndex - 1, fly, 0, false);
     }
-  } else if (e.key === "1") {
-    handleMark(true);
-  } else if (e.key === "2") {
-    handleMark(false);
   }
 });
 
-// Init
-loadProgress();
 resetSession();
 </script>
 </body>
