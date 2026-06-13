@@ -96,7 +96,6 @@
     .card-top .cat-emoji { font-size: 28px; }
     .card-top .cat-name { font-size: 18px; font-weight: 800; color: #1A1A1A; }
     .card-top .spacer { flex: 1; }
-    .card-top .stars { display: flex; gap: 2px; font-size: 14px; color: #FFD400; }
 
     .card-quote { padding: 18px 18px 6px; flex-shrink: 0; }
     .card-quote .quote-text { font-size: 20px; font-weight: 700; line-height: 1.45; color: var(--primary); }
@@ -278,9 +277,6 @@ function resetSession() {
 
 function renderCard(el, card) {
   if (!card) { el.innerHTML = ""; return; }
-  var starsHtml = "";
-  for (var i = 0; i < Math.min(card.difficulty, 3); i++) starsHtml += "&#11088;";
-
   var bdHtml = card.breakdown.map(function(s, i) {
     return '<div class="bd-step">' + (i+1) + '. ' + s + '</div>';
   }).join("");
@@ -297,7 +293,6 @@ function renderCard(el, card) {
       '<span class="cat-emoji">' + catEmoji + '</span>' +
       '<span class="cat-name">' + card.category + '</span>' +
       '<span class="spacer"></span>' +
-      '<span class="stars">' + starsHtml + '</span>' +
     '</div>' +
     '<div class="card-quote">' +
       '<div class="quote-text">' + card.principle + '</div>' +
