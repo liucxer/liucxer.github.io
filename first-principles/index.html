@@ -6,17 +6,17 @@
   <title>第一性原理</title>
   <style>
     :root {
-      --bg-top: #D6C4A2;
-      --bg-mid: #DDCFB2;
-      --bg-bot: #D4C09A;
-      --surface: #EDE0CC;
-      --primary: #2B1806;
-      --secondary: #6B4E2E;
-      --accent: #8B6914;
-      --accent-dim: #C8B070;
-      --border: #C4AE84;
-      --ink-faint: #A89070;
-      --shadow-warm: rgba(92, 61, 26, 0.12);
+      --bg-top: #CBB99E;
+      --bg-mid: #D8CBB5;
+      --bg-bot: #CAB89D;
+      --surface: #F8F3E9;
+      --primary: #1C1105;
+      --secondary: #7A6248;
+      --accent: #A0844C;
+      --accent-dim: #D4C4A0;
+      --border: #C8B898;
+      --ink-faint: #B8A58C;
+      --shadow-base: #3C2410;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html {
@@ -27,7 +27,7 @@
       touch-action: pan-y;
     }
     body {
-      background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-mid) 40%, var(--bg-bot) 70%, var(--bg-top) 100%);
+      background: linear-gradient(180deg, var(--bg-top) 0%, #D4C5AC 25%, var(--bg-mid) 50%, #D2C3A6 75%, var(--bg-bot) 100%);
       color: var(--primary);
       display: flex;
       justify-content: center;
@@ -83,7 +83,7 @@
       width: 100%;
       height: 100%;
       background: var(--surface);
-      border-radius: 12px;
+      border-radius: 10px;
       display: flex;
       flex-direction: column;
       overflow-y: auto;
@@ -92,15 +92,15 @@
       transition: box-shadow 0.25s;
       will-change: transform;
       -webkit-overflow-scrolling: touch;
-      border: 1px solid var(--border);
-      box-shadow: 0 1px 2px rgba(92,61,26,0.08), 0 6px 16px var(--shadow-warm);
+      border: 0.5px solid var(--border);
+      box-shadow: 0 0.5px 1px rgba(60,36,16,0.06), 0 2px 4px rgba(60,36,16,0.08), 0 8px 16px rgba(60,36,16,0.10);
     }
     .card::before {
       content: '';
       position: absolute; inset: 0; pointer-events: none;
-      background: radial-gradient(ellipse at 70% 20%, rgba(139,105,20,0.04) 0%, transparent 60%),
-                  radial-gradient(ellipse at 30% 80%, rgba(107,78,46,0.04) 0%, transparent 50%);
-      border-radius: 12px;
+      background: radial-gradient(ellipse at 70% 20%, rgba(160,132,76,0.025) 0%, transparent 60%),
+                  radial-gradient(ellipse at 30% 80%, rgba(60,36,16,0.025) 0%, transparent 50%);
+      border-radius: 10px;
     }
     .card:active { cursor: grabbing; }
 
@@ -112,13 +112,13 @@
 
     /* ── Card internals ── */
     .card-quote {
-      padding: 28px 24px 10px;
+      padding: 32px 28px 12px;
       text-align: center;
       flex-shrink: 0;
     }
     .card-quote .quote-mark {
       font-family: Georgia, "Noto Serif SC", serif;
-      font-size: 52px;
+      font-size: 22px;
       line-height: 1;
       color: var(--accent-dim);
       margin-bottom: 2px;
@@ -126,7 +126,7 @@
     }
     .card-quote .quote-text {
       font-family: Georgia, "Noto Serif SC", "Source Han Serif SC", serif;
-      font-size: 20px;
+      font-size: 22px;
       font-weight: 600;
       line-height: 1.55;
       color: var(--primary);
@@ -144,12 +144,12 @@
     .card-ornament {
       display: flex;
       justify-content: center;
-      gap: 6px;
-      padding: 6px 0 12px;
+      gap: 7px;
+      padding: 6px 0 14px;
     }
-    .card-ornament span {
+    .card-ornament span { display: block;
       display: block;
-      width: 3px; height: 3px;
+      width: 2.5px; height: 2.5px;
       border-radius: 50%;
       background: var(--accent);
       opacity: 0.5;
@@ -158,7 +158,7 @@
 
     /* ── Sections ── */
     .card-section {
-      padding: 10px 24px;
+      padding: 12px 28px;
       flex-shrink: 0;
     }
     .card-section .sec-label {
@@ -170,7 +170,7 @@
       font-family: Georgia, "Noto Serif SC", serif;
     }
     .card-section .sec-body {
-      font-size: 14px;
+      font-size: 15px;
       color: var(--primary);
       line-height: 1.7;
       font-family: Georgia, "Noto Serif SC", serif;
@@ -180,12 +180,12 @@
     .card-breakdown {
       margin: 6px 28px;
       padding: 12px 16px;
-      border-left: 2px solid rgba(139, 105, 20, 0.4);
-      background: rgba(139, 105, 20, 0.04);
+      border-left: 1.5px solid rgba(160, 132, 76, 0.35);
+      background: rgba(160, 132, 76, 0.04);
       flex-shrink: 0;
     }
     .card-breakdown .bd-step {
-      font-size: 14px;
+      font-size: 15px;
       color: var(--primary);
       line-height: 1.7;
       padding: 2px 0;
@@ -194,7 +194,7 @@
 
     /* Reflect - subtle numbered list */
     .card-reflect {
-      padding: 8px 24px 24px;
+      padding: 10px 28px 28px;
       display: flex;
       flex-direction: column;
       gap: 8px;
@@ -214,22 +214,22 @@
       color: var(--accent);
       flex-shrink: 0;
       font-style: normal;
-      font-size: 14px;
+      font-size: 15px;
     }
 
     /* Thin rule separator */
     .card-rule {
-      height: 1px;
+      height: 0.5px;
       background: var(--border);
-      margin: 14px 40px;
+      margin: 16px 48px;
       flex-shrink: 0;
     }
 
     /* ── Progress Dots ── */
-    .progress-dots {
+    .progress-dots { display: flex; justify-content: center;
       display: flex;
       justify-content: center;
-      gap: 5px;
+      gap: 4px;
       padding: 0 8px;
     }
     .progress-dots .dot {
@@ -252,7 +252,7 @@
 
     /* ── Picker Overlay ── */
     .picker-overlay {
-      position: fixed; inset: 0; background: rgba(43, 24, 6, 0.25);
+      position: fixed; inset: 0; background: rgba(28, 17, 5, 0.3);
       z-index: 200;
       display: flex; align-items: flex-start; justify-content: center;
       opacity: 0; pointer-events: none; transition: opacity 0.2s;
@@ -269,12 +269,12 @@
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
-      border: 1px solid var(--border);
+      box-shadow: 0 12px 36px rgba(60,36,16,0.14);
+      border: 0.5px solid var(--border);
     }
     .picker-sheet button {
       padding: 7px 14px; border-radius: 4px;
-      border: 1px solid var(--border); background: var(--surface);
+      border: 0.5px solid var(--border); background: var(--surface);
       font-size: 13px; color: var(--secondary); cursor: pointer;
       font-family: inherit;
       transition: all 0.15s;
