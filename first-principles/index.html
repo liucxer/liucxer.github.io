@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>第一性原理 — 思维训练卡</title>
+  <style>
+    :root {
+      --bg: #FFF9F0;
+      --primary: #1A1A2E;
+      --secondary: #8A7B6E;
+      --accent: #F5891E;
+      --accent-light: #FFF4D6;
+      --stroke: #EDE2D0;
+      --surface: #FFFFFF;
+      --green: #3F8F2E;
+      --gray: #9CA3AF;
+      --shadow: 0 8px 32px rgba(0,0,0,0.10);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html {
+      font: 16px/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -webkit-user-select: none;
+      user-select: none;
+      touch-action: pan-y;
+    }
+    body {
+      background: var(--bg);
+      color: var(--primary);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100dvh;
+      padding: 16px;
+      overflow: hidden;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .app-header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 4px;
+    }
+    .app-title { font-size: 18px; font-weight: 700; color: var(--primary); }
+    .app-stats { font-size: 13px; color: var(--gray); }
+    .app-stats span { color: var(--accent); font-weight: 700; }
+
+    .card-stack {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 0.72;
+      max-height: 70dvh;
+    }
+    .card-stack > * { position: absolute; inset: 0; }
+
+    .card {
+      width: 100%;
+      height: 100%;
+      background: var(--accent-light);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      cursor: grab;
+      transition: box-shadow 0.2s;
+      will-change: transform;
+    }
+    .card:active { cursor: grabbing; }
+
+    .card.peek {
+      transform: scale(0.94);
+      opacity: 0.45;
+      pointer-events: none;
+    }
+
+    .card-top {
+      background: var(--accent);
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .card-top .cat-emoji { font-size: 28px; }
+    .card-top .cat-name { font-size: 18px; font-weight: 800; color: #1A1A1A; }
+    .card-top .spacer { flex: 1; }
+    .card-top .stars { display: flex; gap: 2px; font-size: 14px; color: #FFD400; }
+
+    .card-quote { padding: 18px 18px 6px; flex-shrink: 0; }
+    .card-quote .quote-text { font-size: 20px; font-weight: 700; line-height: 1.45; color: var(--primary); }
+    .card-quote .quote-author { font-size: 14px; color: var(--secondary); margin-top: 8px; text-align: right; }
+
+    .card-breakdown {
+      margin: 8px 14px;
+      padding: 14px 16px;
+      background: var(--accent);
+      border-radius: 16px;
+      flex-shrink: 0;
+    }
+    .card-breakdown .bd-label {
+      font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.75);
+      text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;
+    }
+    .card-breakdown .bd-steps { display: flex; flex-direction: column; gap: 4px; }
+    .card-breakdown .bd-step { font-size: 15px; font-weight: 600; color: #fff; line-height: 1.5; }
+
+    .card-case { padding: 10px 18px; flex-shrink: 0; }
+    .card-case .case-label {
+      font-size: 12px; font-weight: 700; color: var(--secondary);
+      letter-spacing: 0.04em; margin-bottom: 2px;
+    }
+    .card-case .case-text { font-size: 14px; color: var(--primary); line-height: 1.55; }
+
+    .card-reflect { padding: 10px 18px 14px; flex: 1; display: flex; flex-direction: column; gap: 6px; }
+    .card-reflect .refl-label {
+      font-size: 12px; font-weight: 700; color: var(--secondary);
+      letter-spacing: 0.04em; margin-bottom: 2px;
+    }
+    .card-reflect .refl-q { font-size: 14px; color: var(--primary); display: flex; gap: 6px; align-items: flex-start; line-height: 1.5; }
+    .card-reflect .refl-q .idx { font-weight: 700; color: var(--accent); flex-shrink: 0; }
+
+    .judgment { display: flex; gap: 12px; width: 100%; padding: 0 4px; }
+    .judgment button {
+      flex: 1; padding: 14px 0; border-radius: 16px; border: none;
+      font-size: 16px; font-weight: 600; cursor: pointer;
+      background: var(--surface); color: var(--gray);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      transition: transform 0.15s, box-shadow 0.15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .judgment button:active { transform: scale(0.96); }
+    .judgment .btn-got-it { color: var(--green); }
+    .judgment .btn-again  { color: var(--gray); }
+    .judgment button:disabled { opacity: 0.4; pointer-events: none; }
+
+    .swipe-hint { width: 100%; padding: 0 8px; display: flex; flex-direction: column; gap: 8px; }
+    .progress-bar { width: 100%; height: 5px; background: #E5E7EB; border-radius: 3px; overflow: hidden; }
+    .progress-bar .fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.35s ease; }
+    .swipe-labels { display: flex; justify-content: center; gap: 10px; font-size: 11px; color: #C4C9D4; }
+
+    .overlay {
+      position: fixed; inset: 0; background: var(--bg);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 24px; z-index: 100;
+      opacity: 0; pointer-events: none; transition: opacity 0.4s;
+    }
+    .overlay.show { opacity: 1; pointer-events: auto; }
+    .overlay .big-emoji { font-size: 72px; }
+    .overlay h2 { font-size: 28px; font-weight: 800; }
+    .overlay .encourage { font-size: 18px; color: var(--accent); font-weight: 600; }
+    .overlay .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 280px; }
+    .overlay .stat { background: var(--surface); border-radius: 14px; padding: 14px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+    .overlay .stat .val { font-size: 26px; font-weight: 800; }
+    .overlay .stat .lbl { font-size: 12px; color: var(--secondary); margin-top: 2px; }
+    .overlay .stat .val.green { color: var(--green); }
+    .overlay .stat .val.orange { color: var(--accent); }
+    .overlay .stat .val.gray { color: var(--gray); }
+    .overlay button {
+      width: 260px; padding: 14px; border-radius: 16px; border: none;
+      font-size: 17px; font-weight: 700; cursor: pointer;
+      color: #fff; background: var(--accent);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .overlay button.ghost { background: transparent; color: var(--secondary); font-weight: 500; }
+
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 4px; width: 100%; }
+    .chips button {
+      padding: 6px 12px; border-radius: 20px;
+      border: 1px solid var(--stroke); background: var(--surface);
+      font-size: 12px; color: var(--secondary); cursor: pointer; white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .chips button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<div class="app">
+  <div class="app-header">
+    <div class="app-title">第一性原理</div>
+    <div class="app-stats"><span class="total-stars">0</span> &nbsp; <span class="card-pos">1/10</span></div>
+  </div>
+
+  <div class="chips" id="chip-bar"></div>
+
+  <div class="card-stack" id="stack">
+    <div class="card peek" id="peek-card"></div>
+    <div class="card" id="active-card"></div>
+  </div>
+
+  <div class="judgment">
+    <button class="btn-again" id="btn-again">再想想</button>
+    <button class="btn-got-it" id="btn-got-it">已内化</button>
+  </div>
+
+  <div class="swipe-hint">
+    <div class="progress-bar"><div class="fill" id="progress-fill"></div></div>
+    <div class="swipe-labels"> 或  翻卡 &middot; 键盘 1/2 判分</div>
+  </div>
+</div>
+
+<div class="overlay" id="summary">
+  <div class="big-emoji"></div>
+  <h2>完成啦</h2>
+  <div class="encourage" id="summary-msg"></div>
+  <div class="stat-grid">
+    <div class="stat"><div class="val green" id="sum-correct">0</div><div class="lbl">已内化</div></div>
+    <div class="stat"><div class="val gray" id="sum-wrong">0</div><div class="lbl">再想想</div></div>
+    <div class="stat"><div class="val orange" id="sum-stars">0</div><div class="lbl">获得星星</div></div>
+    <div class="stat"><div class="val" id="sum-accuracy">0%</div><div class="lbl">掌握率</div></div>
+  </div>
+  <button id="btn-restart">再来一组</button>
+  <button class="ghost" id="btn-close">关闭</button>
+</div>
+
+<script>
+// ── Card Data ──
+// Chinese quoted terms use corner brackets 「」 to avoid JS string conflicts.
+var ALL_CARDS = [
+  { id: "p01", category: "哲学", catKey: "philosophy", principle: "第一性原理就是看透事物本质的方法", author: "亚里士多德", difficulty: 1,
+    breakdown: ["什么是「本质」？它是事物不可再分解的元事实", "如何区分表象与本质？追问「这背后是什么」", "从元事实出发，推导出新的可能性"],
+    caseStudy: "亚里士多德用「四因说」（质料因、形式因、动力因、目的因）拆解任何事物的存在理由。这是人类最早的「第一性」思维框架。",
+    prompts: ["你最近一次从「大家都这么说」跳出来独立思考是什么时候？","找一个你习以为常的假设，追问三层「为什么」试试看。"] },
+  { id: "p02", category: "科学", catKey: "science", principle: "如果你不能简单解释，说明你还没有真正理解", author: "理查德·费曼", difficulty: 1,
+    breakdown: ["真正的理解 = 能给外行讲明白", "如果卡在某个点讲不清楚，那里就是你的知识缺口", "用简单的话重述，直到没有模糊地带"],
+    caseStudy: "费曼在教量子电动力学时，要求自己能用日常语言解释每一个方程。他发现——做不到的地方，就是物理学还没搞明白的地方。",
+    prompts: ["选一个你自认为「懂」的概念，试着用三句话讲给一个12岁孩子听。","哪个地方你会开始含糊？那就是你下一步该深挖的。"] },
+  { id: "p03", category: "商业", catKey: "business", principle: "与其更好，不如不同", author: "Peter Thiel（《从0到1》）", difficulty: 2,
+    breakdown: ["竞争是一种零和思维——大家在同一个维度卷", "第一性原理告诉你：重新定义问题，创造新维度", "垄断不是终点，它是创新的结果"],
+    caseStudy: "PayPal 没有跟银行比谁更安全——它重新定义了「支付」这件事：用 email 就能转账。银行花十年才追上这个维度。",
+    prompts: ["你正在做的产品/项目，正在哪个维度上跟别人卷？","如果把那个维度删掉，还能留下什么？"] },
+  { id: "p04", category: "认知", catKey: "cognition", principle: "地图不是疆域", author: "Alfred Korzybski", difficulty: 1,
+    breakdown: ["我们对世界的认知是一张「地图」——简化、抽象、带有偏见", "但真实世界（疆域）比任何地图都复杂", "永远不要把模型当成现实本身"],
+    caseStudy: "天气预报模型预测「降雨概率70%」，但它不等同于「一定会下雨」。把模型=现实，会让你在不下雨时愤怒——但模型本就没承诺确定性。",
+    prompts: ["你最近一次把自己的「地图」当成了「疆域」是什么时候？","有没有一个你坚信不疑的「事实」，可能只是一张旧地图？"] },
+  { id: "p05", category: "数学", catKey: "math", principle: "一个理论的前提越少，它就越接近真理", author: "欧几里得", difficulty: 2,
+    breakdown: ["从最小的公理集合出发，推导出整个几何体系", "每增加一个前提，就增加了一个出错的可能", "奥卡姆剃刀的数学表达：如无必要，勿增实体"],
+    caseStudy: "欧几里得只用5条公设建立了整个几何学。两千年后，数学家发现只要改第5条，就得到了完全不同的非欧几何——前提的力量。",
+    prompts: ["你现在的某个判断，依赖了多少「默认前提」？","试着删掉其中一条前提，结论还成立吗？"] },
+  { id: "p06", category: "系统", catKey: "systems", principle: "我们的直觉擅长线性思考，但世界是非线性的", author: "Donella Meadows", difficulty: 2,
+    breakdown: ["线性：投入2倍 = 收获2倍。非线性：投入2倍 = 可能0收获，也可能100倍收获", "反馈循环放大了小的变化——复利、网络效应、口碑", "找到系统的「杠杆点」比盲目加大投入有效得多"],
+    caseStudy: "亚马逊增长飞轮：更低价格更多流量更多卖家更好选品更低价格。一个正反馈循环，投入不见得翻倍，产出却指数增长。",
+    prompts: ["你正在做的哪件事，可能有「非线性回报」？","找到那个正反馈循环，然后只推那个方向。"] },
+  { id: "p07", category: "哲学", catKey: "philosophy", principle: "我思故我在——唯一不能怀疑的，是你正在怀疑这件事本身", author: "笛卡尔", difficulty: 2,
+    breakdown: ["彻底怀疑一切：感官可能欺骗你，梦可能模仿现实", "但「我正在怀疑」这个行为本身，证明思考者存在", "这是一条不可再分解的元真理——「我」存在"],
+    caseStudy: "笛卡尔从「怀疑一切」开始，发现唯一无法怀疑的就是「怀疑」这个动作本身。这就是第一性原理——找到那个你无法再往下拆的基石。",
+    prompts: ["你的信念体系里，哪一条是「不可再拆」的？","试着怀疑一条你从未怀疑过的东西。会发生什么？"] },
+  { id: "p08", category: "科学", catKey: "science", principle: "想象力比知识更重要", author: "爱因斯坦", difficulty: 1,
+    breakdown: ["知识是已有的、已知的——它被锁在过去", "想象力可以跳到任何地方——包括从未存在过的可能性", "从第一性原理推导，需要的不是知识量，而是想象新框架的勇气"],
+    caseStudy: "爱因斯坦16岁时想象「如果追上一束光，会看到什么？」这个思想实验不是靠知识——当时没人知道答案。但他跳跃到了物理学的未来。",
+    prompts: ["如果规则都不存在，你会怎么做？","放下「这不可能」，问「如果可能，它会怎样？」"] },
+  { id: "p09", category: "商业", catKey: "business", principle: "关注不变的东西，比追逐变化更持久", author: "Jeff Bezos", difficulty: 2,
+    breakdown: ["变化吸引注意力，但「不变」才是长期战略的锚", "顾客永远想要更便宜、更快、更多选择——这三件事一百年不变", "把资源押注在不变的东西上，十年后你不会过时"],
+    caseStudy: "亚马逊把所有资源投在三件事上：更低价格、更快配送、更多选品。电商形态一直在变，但这三条顾客需求从未改变。",
+    prompts: ["你所处的领域里，什么东西10年后不会变？","你现在的努力，有多少投在了「不变」的东西上？"] },
+  { id: "p10", category: "认知", catKey: "cognition", principle: "永远不要把你无法反驳的东西当作真理", author: "Karl Popper", difficulty: 3,
+    breakdown: ["一个理论是科学的，当且仅当它是可证伪的", "不能被反驳的命题——比如「一切都是命运」——不是真理，是不可验证", "第一性原理可被检验；教条不可以"],
+    caseStudy: "弗洛伊德的「无意识」理论被波普尔批评为不可证伪：无论什么行为，都可用「无意识心理」解释——但不接受反驳的理论，信息量为零。",
+    prompts: ["你有一个珍惜的想法——你能说清楚，什么条件下你会放弃它吗？","如果不能，它可能是信念，不是原理。"] },
+  { id: "p11", category: "数学", catKey: "math", principle: "概率不是预测——它是你在不确定世界中的认知框架", author: "Bayes / Laplace", difficulty: 3,
+    breakdown: ["先验概率：在没有任何新信息时，你的初始信念", "新证据：每一条新信息按似然度更新你的信念", "后验概率：更新后的信念——这是你知道的全部"],
+    caseStudy: "医生用一个测试（99%准确率）检测一种罕见病（发病率0.1%）。阳性结果意味着你患病的概率不是99%，而是约9%——因为先验概率极低。Bayes思维改变一切。",
+    prompts: ["你最近做了一个判断，你的「先验概率」是什么？","你收到了什么「新证据」？更新后的概率变了吗？"] },
+  { id: "p12", category: "系统", catKey: "systems", principle: "林迪效应：已经存在越久的东西，预期还会存在更久", author: "Nassim Taleb", difficulty: 1,
+    breakdown: ["对于非易逝物（想法、技术、制度），过去的寿命是未来寿命的最强预测器", "一本书已出版200年仍被阅读 预期再活200年。一本刚出的畅销书 可能明年就被遗忘", "时间是最诚实的过滤器——它不关心营销预算"],
+    caseStudy: "《几何原本》2300年后仍在印刷。比特币诞生14年尚未消失。一个刚融资10亿美元的AI公司——还无法判定它的林迪效应。",
+    prompts: ["你最近追随的某个「趋势」，有多久的林迪效应？","你的时间投资里，有多少投在了「林迪力量强」的东西上？"] },
+  { id: "p13", category: "哲学", catKey: "philosophy", principle: "人是万物的尺度", author: "普罗泰戈拉", difficulty: 2,
+    breakdown: ["不存在「客观」的冷暖——冷对你来说是冷，对我可能不是", "每个人的感知构成了他们的真实。没有谁的真实更「真实」", "但这不等于「怎样都行」——逻辑仍然是共享的"],
+    caseStudy: "用户体验设计的第一条原则：你不是你的用户。你觉得「明显」的按钮，对60岁阿姨可能完全不可见。不是她错了，也不是你错了——是你们的「尺度」不同。",
+    prompts: ["你最近跟谁争论过？对方的「尺度」是什么？","如果假设对方的真实跟你的一样有效，你的结论会变吗？"] },
+  { id: "p14", category: "科学", catKey: "science", principle: "万物的精确度有一个自然的极限——不是因为我们的仪器不够好", author: "海森堡（不确定性原理）", difficulty: 3,
+    breakdown: ["在量子层面，位置和动量不能同时被精确测量", "这不仅是测量技术的局限，而是自然的本质属性", "有些东西——不确定性本身——是第一性的，不是临时的"],
+    caseStudy: "不确定性原理推翻了拉普拉斯妖的幻想：即使你知道宇宙中每个粒子的当前位置，你也不可能精确预言未来。未来内在地是不确定的。",
+    prompts: ["有没有一个你一直想「精确控制」的东西，本质上是不确定的？","如果接受不确定性，你的策略会怎么变？"] },
+  { id: "p15", category: "商业", catKey: "business", principle: "把一件事做到极致，好过把十件事做到平庸", author: "Steve Jobs", difficulty: 1,
+    breakdown: ["资源有限 分散 = 处处平庸", "第一性原理问：什么是最重要的一件？", "对其它1000件事说「不」，是集中能量的前提"],
+    caseStudy: "Jobs 1997年回苹果时砍掉了70%的产品线，只留四个象限：消费/专业  台式/便携。集中力量做四种极致产品，而不是几十种平庸机型。",
+    prompts: ["你的工作/生活里，正在做多少件「还行」的事？","如果只能留一件，哪一件？为什么它值得？"] }
+];
+
+// Categories
+var CATEGORIES = [
+  { key: "all",       label: "全部" },
+  { key: "philosophy", label: "哲学" },
+  { key: "science",    label: "科学" },
+  { key: "business",   label: "商业" },
+  { key: "cognition",  label: "认知" },
+  { key: "math",       label: "数学" },
+  { key: "systems",    label: "系统" },
+];
+
+// State
+var STORAGE_KEY = "fp_progress_v1";
+var progress = {};
+var cards = [];
+var currentIndex = 0;
+var sessionCorrect = 0;
+var sessionWrong = 0;
+var sessionStars = 0;
+var activeFilter = "all";
+var isTransitioning = false;
+var dragStart = null;
+var dragOffset = { x: 0, y: 0 };
+
+// DOM
+var stack = document.getElementById("stack");
+var activeCard = document.getElementById("active-card");
+var peekCard = document.getElementById("peek-card");
+var progressFill = document.getElementById("progress-fill");
+var cardPos = document.querySelector(".card-pos");
+var totalStarsEl = document.querySelector(".total-stars");
+var chipBar = document.getElementById("chip-bar");
+var summary = document.getElementById("summary");
+var btnAgain = document.getElementById("btn-again");
+var btnGotIt = document.getElementById("btn-got-it");
+var btnRestart = document.getElementById("btn-restart");
+var btnClose = document.getElementById("btn-close");
+
+// Progress
+function loadProgress() {
+  try { var raw = localStorage.getItem(STORAGE_KEY); if (raw) progress = JSON.parse(raw); }
+  catch(e) { progress = {}; }
+}
+function saveProgress() { localStorage.setItem(STORAGE_KEY, JSON.stringify(progress)); }
+function cp(id) { return progress[id] || { correct: 0, wrong: 0, stars: 0 }; }
+function totalStars() {
+  var s = 0; Object.values(progress).forEach(function(p) { s += p.stars || 0; }); return s;
+}
+
+// Build deck: weighted shuffle by 1/(correct+1)
+function buildDeck() {
+  var pool = activeFilter === "all" ? ALL_CARDS : ALL_CARDS.filter(function(c) { return c.catKey === activeFilter; });
+  var keyed = pool.map(function(c) {
+    var w = 1 / (cp(c.id).correct + 1);
+    var u = Math.random() * (1 - 1e-12) + 1e-12;
+    return { card: c, key: -Math.log(u) / w };
+  });
+  keyed.sort(function(a, b) { return a.key - b.key; });
+  return keyed.map(function(k) { return k.card; });
+}
+
+function resetSession() {
+  cards = buildDeck();
+  currentIndex = 0;
+  dragOffset = { x: 0, y: 0 };
+  sessionCorrect = 0;
+  sessionWrong = 0;
+  sessionStars = 0;
+  isTransitioning = false;
+  updateUI();
+  renderChips();
+}
+
+// Render
+function renderCard(el, card) {
+  if (!card) { el.innerHTML = ""; return; }
+  var starsHtml = "";
+  for (var i = 0; i < Math.min(card.difficulty, 3); i++) starsHtml += "&#11088;";
+
+  var bdHtml = card.breakdown.map(function(s, i) {
+    return '<div class="bd-step">' + (i+1) + '. ' + s + '</div>';
+  }).join("");
+
+  var NUMS = ['①','②','③'];
+  var promptsHtml = card.prompts.map(function(q, i) {
+    return '<div class="refl-q"><span class="idx">' + (NUMS[i] || (i+1)) + '</span>' + q + '</div>';
+  }).join("");
+
+  var cprog = cp(card.id);
+  var badge = "";
+  if (cprog.correct >= 3) {
+    badge = '<span style="background:#2E7D32;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;"> 掌握</span>';
+  } else if (cprog.correct >= 1) {
+    badge = '<span style="background:#fff;color:#2E7D32;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">' + cprog.correct + '</span>';
+  }
+
+  var catEmoji = { "哲学":"", "科学":"", "商业":"", "认知":"", "数学":"", "系统":"" }[card.category] || "";
+
+  el.innerHTML =
+    '<div class="card-top">' +
+      '<span class="cat-emoji">' + catEmoji + '</span>' +
+      '<span class="cat-name">' + card.category + '</span>' +
+      '<span class="spacer"></span>' +
+      '<span class="stars">' + starsHtml + '</span>' +
+      badge +
+    '</div>' +
+    '<div class="card-quote">' +
+      '<div class="quote-text">' + card.principle + '</div>' +
+      '<div class="quote-author">' + card.author + '</div>' +
+    '</div>' +
+    '<div class="card-breakdown">' +
+      '<div class="bd-label"> 第一性拆解</div>' +
+      '<div class="bd-steps">' + bdHtml + '</div>' +
+    '</div>' +
+    '<div class="card-case">' +
+      '<div class="case-label"> 案例</div>' +
+      '<div class="case-text">' + card.caseStudy + '</div>' +
+    '</div>' +
+    '<div class="card-reflect">' +
+      '<div class="refl-label"> 反思</div>' +
+      promptsHtml +
+    '</div>';
+}
+
+function updateUI() {
+  if (cards.length === 0) {
+    activeCard.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--secondary);font-size:18px;">没有符合条件的卡片</div>';
+    peekCard.innerHTML = "";
+    progressFill.style.width = "0%";
+    cardPos.textContent = "0/0";
+    totalStarsEl.textContent = totalStars();
+    return;
+  }
+  renderCard(activeCard, cards[currentIndex]);
+  var next = currentIndex + 1 < cards.length ? cards[currentIndex + 1] : null;
+  if (next && !isTransitioning) {
+    renderCard(peekCard, next);
+    peekCard.style.display = "";
+  } else {
+    peekCard.style.display = "none";
+  }
+  progressFill.style.width = ((currentIndex + 1) / cards.length * 100) + "%";
+  cardPos.textContent = (currentIndex + 1) + "/" + cards.length;
+  totalStarsEl.textContent = totalStars();
+  activeCard.style.transform = "translate(" + dragOffset.x + "px, " + dragOffset.y + "px) rotate(" + (dragOffset.x / 24) + "deg)";
+}
+
+// Chips
+function renderChips() {
+  var html = "";
+  CATEGORIES.forEach(function(c) {
+    html += '<button class="' + (activeFilter === c.key ? 'on' : '') + '" data-key="' + c.key + '">' + c.label + '</button>';
+  });
+  chipBar.innerHTML = html;
+  chipBar.querySelectorAll("button").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+      activeFilter = btn.dataset.key;
+      resetSession();
+    });
+  });
+}
+
+// Gesture
+function getPos(e) {
+  if (e.touches && e.touches.length) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  return { x: e.clientX, y: e.clientY };
+}
+
+function onStart(e) {
+  if (isTransitioning || cards.length === 0) return;
+  e.preventDefault();
+  var p = getPos(e);
+  dragStart = { x: p.x, y: p.y, cardX: dragOffset.x, cardY: dragOffset.y };
+  activeCard.style.transition = "none";
+}
+
+function onMove(e) {
+  if (!dragStart) return;
+  e.preventDefault();
+  var p = getPos(e);
+  dragOffset.x = dragStart.cardX + (p.x - dragStart.x);
+  dragOffset.y = dragStart.cardY + (p.y - dragStart.y);
+  activeCard.style.transform = "translate(" + dragOffset.x + "px, " + dragOffset.y + "px) rotate(" + (dragOffset.x / 24) + "deg)";
+}
+
+function onEnd(e) {
+  if (!dragStart) return;
+  var dx = dragOffset.x - dragStart.cardX;
+  var dy = dragOffset.y - dragStart.cardY;
+  var absX = Math.abs(dx);
+  var absY = Math.abs(dy);
+  var threshold = 60;
+
+  if (Math.max(absX, absY) < threshold) {
+    dragOffset.x = 0; dragOffset.y = 0;
+    activeCard.style.transition = "transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1)";
+    activeCard.style.transform = "translate(0, 0) rotate(0deg)";
+    dragStart = null;
+    return;
+  }
+
+  var stackRect = stack.getBoundingClientRect();
+  var flyX = Math.max(stackRect.width, 500);
+  var flyY = Math.max(stackRect.height, 800);
+  var toIndex = currentIndex;
+
+  if (absX >= absY) {
+    if (dx < 0 && currentIndex < cards.length - 1) toIndex = currentIndex + 1;
+    else if (dx > 0 && currentIndex > 0) toIndex = currentIndex - 1;
+  } else {
+    if (dy < 0 && currentIndex < cards.length - 1) toIndex = currentIndex + 1;
+    else if (dy > 0 && currentIndex > 0) toIndex = currentIndex - 1;
+  }
+
+  if (toIndex !== currentIndex) {
+    var goingForward = toIndex > currentIndex;
+    var exitX = absX >= absY ? (goingForward ? -flyX : flyX) : 0;
+    var exitY = absX < absY ? (goingForward ? -flyY : flyY) : 0;
+    animatePageTurn(toIndex, exitX, exitY, goingForward);
+  } else {
+    dragOffset.x = 0; dragOffset.y = 0;
+    activeCard.style.transition = "transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1)";
+    activeCard.style.transform = "translate(0, 0) rotate(0deg)";
+  }
+  dragStart = null;
+}
+
+activeCard.addEventListener("mousedown", onStart);
+activeCard.addEventListener("touchstart", onStart, { passive: false });
+window.addEventListener("mousemove", function(e) { if (dragStart) onMove(e); });
+window.addEventListener("touchmove", function(e) { if (dragStart) onMove(e); }, { passive: false });
+window.addEventListener("mouseup", onEnd);
+window.addEventListener("touchend", onEnd);
+
+// Animation
+function animatePageTurn(toIndex, exitX, exitY, isForward) {
+  isTransitioning = true;
+  btnAgain.disabled = true;
+  btnGotIt.disabled = true;
+  peekCard.style.display = "none";
+
+  // Phase 1: fly out
+  dragOffset.x = exitX;
+  dragOffset.y = exitY;
+  activeCard.style.transition = "transform 0.22s ease-out";
+  activeCard.style.transform = "translate(" + exitX + "px, " + exitY + "px) rotate(" + (exitX / 24) + "deg)";
+
+  setTimeout(function() {
+    // Phase 2: swap index, jump to opposite side
+    currentIndex = toIndex;
+    var enterX = -exitX;
+    var enterY = -exitY;
+    dragOffset.x = enterX;
+    dragOffset.y = enterY;
+    activeCard.style.transition = "none";
+    activeCard.style.transform = "translate(" + enterX + "px, " + enterY + "px) rotate(" + (enterX / 24) + "deg)";
+
+    // Force reflow
+    activeCard.offsetHeight;
+
+    // Phase 3: spring in
+    requestAnimationFrame(function() {
+      renderCard(activeCard, cards[currentIndex]);
+      dragOffset.x = 0;
+      dragOffset.y = 0;
+      activeCard.style.transition = "transform 0.42s cubic-bezier(0.25, 0.1, 0.1, 1)";
+      activeCard.style.transform = "translate(0, 0) rotate(0deg)";
+      progressFill.style.width = ((currentIndex + 1) / cards.length * 100) + "%";
+      cardPos.textContent = (currentIndex + 1) + "/" + cards.length;
+    });
+
+    setTimeout(function() {
+      isTransitioning = false;
+      btnAgain.disabled = false;
+      btnGotIt.disabled = false;
+      updateUI();
+    }, 450);
+  }, 230);
+}
+
+// Buttons
+function handleMark(correct) {
+  if (isTransitioning || cards.length === 0) return;
+  var card = cards[currentIndex];
+  var cprog = cp(card.id);
+  if (correct) {
+    cprog.correct = (cprog.correct || 0) + 1;
+    cprog.stars = (cprog.stars || 0) + card.difficulty;
+    sessionCorrect++;
+    sessionStars += card.difficulty;
+  } else {
+    cprog.wrong = (cprog.wrong || 0) + 1;
+    sessionWrong++;
+  }
+  progress[card.id] = cprog;
+  saveProgress();
+
+  if (currentIndex >= cards.length - 1) {
+    updateUI();
+    showSummary();
+  } else {
+    var fly = Math.max(stack.getBoundingClientRect().width || 400, 500);
+    animatePageTurn(currentIndex + 1, -fly, 0, true);
+  }
+}
+
+btnGotIt.addEventListener("click", function() { handleMark(true); });
+btnAgain.addEventListener("click", function() { handleMark(false); });
+
+// Summary
+function showSummary() {
+  var total = sessionCorrect + sessionWrong;
+  var acc = total > 0 ? Math.round(sessionCorrect / total * 100) : 0;
+  var msg = "继续加油";
+  if (acc >= 90) msg = "太棒了你正在建立第一性思维";
+  else if (acc >= 70) msg = "干得不错继续内化这些原理";
+  else if (acc >= 50) msg = "有进步这些概念需要反复咀嚼";
+
+  document.getElementById("sum-correct").textContent = sessionCorrect;
+  document.getElementById("sum-wrong").textContent = sessionWrong;
+  document.getElementById("sum-stars").textContent = sessionStars;
+  document.getElementById("sum-accuracy").textContent = acc + "%";
+  document.getElementById("summary-msg").textContent = msg;
+  summary.classList.add("show");
+}
+
+btnRestart.addEventListener("click", function() {
+  summary.classList.remove("show");
+  resetSession();
+});
+
+btnClose.addEventListener("click", function() {
+  summary.classList.remove("show");
+  resetSession();
+});
+
+// Keyboard
+window.addEventListener("keydown", function(e) {
+  if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+    e.preventDefault();
+    if (!isTransitioning && currentIndex < cards.length - 1) {
+      var fly = Math.max(stack.getBoundingClientRect().width || 400, 500);
+      animatePageTurn(currentIndex + 1, -fly, 0, true);
+    }
+  } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+    e.preventDefault();
+    if (!isTransitioning && currentIndex > 0) {
+      var fly = Math.max(stack.getBoundingClientRect().width || 400, 500);
+      animatePageTurn(currentIndex - 1, fly, 0, false);
+    }
+  } else if (e.key === "1") {
+    handleMark(true);
+  } else if (e.key === "2") {
+    handleMark(false);
+  }
+});
+
+// Init
+loadProgress();
+resetSession();
+</script>
+</body>
+</html>
