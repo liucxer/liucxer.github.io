@@ -85,18 +85,6 @@
       pointer-events: none;
     }
 
-    .card-top {
-      background: var(--accent);
-      padding: 16px 18px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-shrink: 0;
-    }
-    .card-top .cat-emoji { font-size: 28px; }
-    .card-top .cat-name { font-size: 18px; font-weight: 800; color: #1A1A1A; }
-    .card-top .spacer { flex: 1; }
-
     .card-quote { padding: 18px 18px 6px; flex-shrink: 0; }
     .card-quote .quote-text { font-size: 20px; font-weight: 700; line-height: 1.45; color: var(--primary); }
     .card-quote .quote-author { font-size: 14px; color: var(--secondary); margin-top: 8px; text-align: right; }
@@ -381,14 +369,7 @@ function renderCard(el, card) {
     return '<div class="refl-q"><span class="idx">' + (NUMS[i] || (i+1)) + '</span>' + q + '</div>';
   }).join("");
 
-  var catEmoji = { "哲学":"", "科学":"", "商业":"", "认知":"", "数学":"", "系统":"" }[card.category] || "";
-
   el.innerHTML =
-    '<div class="card-top">' +
-      '<span class="cat-emoji">' + catEmoji + '</span>' +
-      '<span class="cat-name">' + card.category + '</span>' +
-      '<span class="spacer"></span>' +
-    '</div>' +
     '<div class="card-quote">' +
       '<div class="quote-text">' + card.principle + '</div>' +
       '<div class="quote-author">' + card.author + '</div>' +
