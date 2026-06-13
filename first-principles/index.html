@@ -72,10 +72,12 @@
       box-shadow: var(--shadow);
       display: flex;
       flex-direction: column;
-      overflow: hidden;
+      overflow-y: auto;
+      overflow-x: hidden;
       cursor: grab;
       transition: box-shadow 0.2s;
       will-change: transform;
+      -webkit-overflow-scrolling: touch;
     }
     .card:active { cursor: grabbing; }
 
@@ -207,7 +209,7 @@
 
   <div class="swipe-hint">
     <div class="progress-bar"><div class="fill" id="progress-fill"></div></div>
-    <div class="swipe-labels"> 或  翻卡 &middot; 键盘 1/2 判分</div>
+    <div class="swipe-labels"> 左滑下一张 &middot; 右滑上一张 &middot; 键盘 1/2 判分</div>
   </div>
 </div>
 
@@ -459,32 +461,45 @@ function getPos(e) {
   return { x: e.clientX, y: e.clientY };
 }
 
+var dragLocked = false;  // true once we commit to a horizontal card-drag
+
 function onStart(e) {
   if (isTransitioning || cards.length === 0) return;
-  e.preventDefault();
   var p = getPos(e);
   dragStart = { x: p.x, y: p.y, cardX: dragOffset.x, cardY: dragOffset.y };
-  activeCard.style.transition = "none";
+  dragLocked = false;
 }
 
 function onMove(e) {
   if (!dragStart) return;
-  e.preventDefault();
   var p = getPos(e);
-  dragOffset.x = dragStart.cardX + (p.x - dragStart.x);
-  dragOffset.y = dragStart.cardY + (p.y - dragStart.y);
-  activeCard.style.transform = "translate(" + dragOffset.x + "px, " + dragOffset.y + "px) rotate(" + (dragOffset.x / 24) + "deg)";
+  var dx = p.x - dragStart.x;
+  var dy = p.y - dragStart.y;
+
+  if (!dragLocked) {
+    // Commit to horizontal card-drag only when it clearly dominates.
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 8) {
+      dragLocked = true;
+      activeCard.style.transition = "none";
+    } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
+      // Vertical scroll — release the gesture so the card can scroll naturally.
+      dragStart = null;
+      return;
+    } else {
+      return;  // still ambiguous, wait
+    }
+  }
+
+  e.preventDefault();
+  dragOffset.x = dragStart.cardX + dx;
+  dragOffset.y = 0;
+  activeCard.style.transform = "translate(" + dragOffset.x + "px, 0px) rotate(" + (dragOffset.x / 24) + "deg)";
 }
 
 function onEnd(e) {
   if (!dragStart) return;
-  var dx = dragOffset.x - dragStart.cardX;
-  var dy = dragOffset.y - dragStart.cardY;
-  var absX = Math.abs(dx);
-  var absY = Math.abs(dy);
-  var threshold = 60;
-
-  if (Math.max(absX, absY) < threshold) {
+  if (!dragLocked) {
+    // Never committed to a horizontal drag — just reset.
     dragOffset.x = 0; dragOffset.y = 0;
     activeCard.style.transition = "transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1)";
     activeCard.style.transform = "translate(0, 0) rotate(0deg)";
@@ -492,24 +507,28 @@ function onEnd(e) {
     return;
   }
 
-  var stackRect = stack.getBoundingClientRect();
-  var flyX = Math.max(stackRect.width, 500);
-  var flyY = Math.max(stackRect.height, 800);
+  var dx = dragOffset.x - dragStart.cardX;
+  var absX = Math.abs(dx);
+  var threshold = 60;
+
+  if (absX < threshold) {
+    dragOffset.x = 0; dragOffset.y = 0;
+    activeCard.style.transition = "transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1)";
+    activeCard.style.transform = "translate(0, 0) rotate(0deg)";
+    dragStart = null;
+    return;
+  }
+
+  var flyX = Math.max(stack.getBoundingClientRect().width, 500);
   var toIndex = currentIndex;
 
-  if (absX >= absY) {
-    if (dx < 0 && currentIndex < cards.length - 1) toIndex = currentIndex + 1;
-    else if (dx > 0 && currentIndex > 0) toIndex = currentIndex - 1;
-  } else {
-    if (dy < 0 && currentIndex < cards.length - 1) toIndex = currentIndex + 1;
-    else if (dy > 0 && currentIndex > 0) toIndex = currentIndex - 1;
-  }
+  if (dx < 0 && currentIndex < cards.length - 1) toIndex = currentIndex + 1;
+  else if (dx > 0 && currentIndex > 0) toIndex = currentIndex - 1;
 
   if (toIndex !== currentIndex) {
     var goingForward = toIndex > currentIndex;
-    var exitX = absX >= absY ? (goingForward ? -flyX : flyX) : 0;
-    var exitY = absX < absY ? (goingForward ? -flyY : flyY) : 0;
-    animatePageTurn(toIndex, exitX, exitY, goingForward);
+    var exitX = goingForward ? -flyX : flyX;
+    animatePageTurn(toIndex, exitX, 0, goingForward);
   } else {
     dragOffset.x = 0; dragOffset.y = 0;
     activeCard.style.transition = "transform 0.4s cubic-bezier(0.25, 0.1, 0.25, 1)";
@@ -629,13 +648,13 @@ btnClose.addEventListener("click", function() {
 
 // Keyboard
 window.addEventListener("keydown", function(e) {
-  if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+  if (e.key === "ArrowLeft") {
     e.preventDefault();
     if (!isTransitioning && currentIndex < cards.length - 1) {
       var fly = Math.max(stack.getBoundingClientRect().width || 400, 500);
       animatePageTurn(currentIndex + 1, -fly, 0, true);
     }
-  } else if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+  } else if (e.key === "ArrowRight") {
     e.preventDefault();
     if (!isTransitioning && currentIndex > 0) {
       var fly = Math.max(stack.getBoundingClientRect().width || 400, 500);
