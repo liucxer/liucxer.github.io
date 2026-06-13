@@ -3,22 +3,21 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-  <title>第一性原理 — 思维训练卡</title>
+  <title>第一性原理</title>
   <style>
     :root {
-      --bg: #FFF9F0;
-      --primary: #1A1A2E;
-      --secondary: #8A7B6E;
-      --accent: #F5891E;
-      --accent-light: #FFF4D6;
-      --stroke: #EDE2D0;
-      --surface: #FFFFFF;
-      --gray: #9CA3AF;
-      --shadow: 0 8px 32px rgba(0,0,0,0.10);
+      --bg: #F3EFE9;
+      --surface: #FBFAF7;
+      --primary: #2C2416;
+      --secondary: #8C8274;
+      --accent: #B8943E;
+      --accent-dim: #E8DCC4;
+      --border: #E0D9CD;
+      --shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.05);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html {
-      font: 16px/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+      font: 16px/1.7 -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Noto Serif SC", "Source Han Serif SC", "Microsoft YaHei", serif;
       -webkit-font-smoothing: antialiased;
       -webkit-user-select: none;
       user-select: none;
@@ -31,126 +30,239 @@
       justify-content: center;
       align-items: center;
       min-height: 100dvh;
-      padding: 16px;
+      padding: 20px;
       overflow: hidden;
     }
 
     .app {
       width: 100%;
-      max-width: 420px;
+      max-width: 400px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 12px;
+      gap: 16px;
     }
 
+    /* ── Header ── */
     .app-header {
       width: 100%;
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      padding: 0 4px;
+      align-items: baseline;
+      padding: 0 6px;
     }
-    .app-title { font-size: 18px; font-weight: 700; color: var(--primary); }
-    .app-stats { font-size: 13px; color: var(--gray); }
+    .app-title {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--secondary);
+      letter-spacing: 0.06em;
+    }
+    .app-stats {
+      font-size: 12px;
+      color: var(--secondary);
+      cursor: pointer;
+      letter-spacing: 0.03em;
+      transition: color 0.2s;
+    }
+    .app-stats:hover { color: var(--accent); }
 
+    /* ── Card Stack ── */
     .card-stack {
       position: relative;
       width: 100%;
-      aspect-ratio: 0.72;
-      max-height: 70dvh;
+      aspect-ratio: 0.68;
+      max-height: 68dvh;
     }
     .card-stack > * { position: absolute; inset: 0; }
 
+    /* ── Card ── */
     .card {
       width: 100%;
       height: 100%;
-      background: var(--accent-light);
-      border-radius: 28px;
+      background: var(--surface);
+      border-radius: 6px;
       box-shadow: var(--shadow);
       display: flex;
       flex-direction: column;
       overflow-y: auto;
       overflow-x: hidden;
       cursor: grab;
-      transition: box-shadow 0.2s;
+      transition: box-shadow 0.25s;
       will-change: transform;
       -webkit-overflow-scrolling: touch;
+      border: 1px solid var(--border);
     }
     .card:active { cursor: grabbing; }
 
     .card.peek {
-      transform: scale(0.94);
-      opacity: 0.45;
+      transform: scale(0.95);
+      opacity: 0.35;
       pointer-events: none;
     }
 
-    .card-quote { padding: 18px 18px 6px; flex-shrink: 0; }
-    .card-quote .quote-text { font-size: 20px; font-weight: 700; line-height: 1.45; color: var(--primary); }
-    .card-quote .quote-author { font-size: 14px; color: var(--secondary); margin-top: 8px; text-align: right; }
-
-    .card-breakdown {
-      margin: 8px 14px;
-      padding: 14px 16px;
-      background: var(--accent);
-      border-radius: 16px;
+    /* ── Card internals ── */
+    .card-quote {
+      padding: 28px 24px 10px;
+      text-align: center;
       flex-shrink: 0;
     }
-    .card-breakdown .bd-label {
-      font-size: 12px; font-weight: 700; color: rgba(255,255,255,0.75);
-      text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px;
+    .card-quote .quote-mark {
+      font-family: Georgia, "Noto Serif SC", serif;
+      font-size: 48px;
+      line-height: 1;
+      color: var(--accent-dim);
+      margin-bottom: 4px;
+      font-weight: 400;
     }
-    .card-breakdown .bd-steps { display: flex; flex-direction: column; gap: 4px; }
-    .card-breakdown .bd-step { font-size: 15px; font-weight: 600; color: #fff; line-height: 1.5; }
-
-    .card-case { padding: 10px 18px; flex-shrink: 0; }
-    .card-case .case-label {
-      font-size: 12px; font-weight: 700; color: var(--secondary);
-      letter-spacing: 0.04em; margin-bottom: 2px;
+    .card-quote .quote-text {
+      font-family: Georgia, "Noto Serif SC", "Source Han Serif SC", serif;
+      font-size: 20px;
+      font-weight: 600;
+      line-height: 1.55;
+      color: var(--primary);
+      letter-spacing: 0.01em;
     }
-    .card-case .case-text { font-size: 14px; color: var(--primary); line-height: 1.55; }
-
-    .card-reflect { padding: 10px 18px 18px; display: flex; flex-direction: column; gap: 6px; }
-    .card-reflect .refl-label {
-      font-size: 12px; font-weight: 700; color: var(--secondary);
-      letter-spacing: 0.04em; margin-bottom: 2px;
+    .card-quote .quote-author {
+      font-size: 13px;
+      color: var(--secondary);
+      margin-top: 12px;
+      font-style: italic;
+      letter-spacing: 0.02em;
     }
-    .card-reflect .refl-q { font-size: 14px; color: var(--primary); display: flex; gap: 6px; align-items: flex-start; line-height: 1.5; }
-    .card-reflect .refl-q .idx { font-weight: 700; color: var(--accent); flex-shrink: 0; }
 
-    .swipe-hint { width: 100%; padding: 0 8px; display: flex; flex-direction: column; gap: 8px; }
-    .progress-bar { width: 100%; height: 5px; background: #E5E7EB; border-radius: 3px; overflow: hidden; }
-    .progress-bar .fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.35s ease; }
-    .swipe-labels { display: flex; justify-content: center; gap: 10px; font-size: 11px; color: #C4C9D4; }
+    .card-divider {
+      width: 32px;
+      height: 1px;
+      background: var(--accent);
+      margin: 0 auto 6px;
+      opacity: 0.5;
+    }
 
-    .card-pos { cursor: pointer; }
-    .card-pos:hover { color: var(--accent); }
+    /* ── Sections ── */
+    .card-section {
+      padding: 10px 24px;
+      flex-shrink: 0;
+    }
+    .card-section .sec-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--accent);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .card-section .sec-body {
+      font-size: 14px;
+      color: var(--primary);
+      line-height: 1.7;
+    }
 
-    /* Category picker popover */
+    /* Breakdown - left border style */
+    .card-breakdown {
+      margin: 6px 24px;
+      padding: 12px 16px;
+      border-left: 2px solid var(--accent);
+      background: rgba(184, 148, 62, 0.04);
+      flex-shrink: 0;
+    }
+    .card-breakdown .bd-step {
+      font-size: 14px;
+      color: var(--primary);
+      line-height: 1.7;
+      padding: 2px 0;
+    }
+    .card-breakdown .bd-step::before {
+      content: '';
+    }
+
+    /* Reflect - subtle numbered list */
+    .card-reflect {
+      padding: 8px 24px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .card-reflect .refl-q {
+      font-size: 13px;
+      color: var(--secondary);
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+      line-height: 1.6;
+      font-style: italic;
+    }
+    .card-reflect .refl-q .idx {
+      font-weight: 600;
+      color: var(--accent);
+      flex-shrink: 0;
+      font-style: normal;
+      font-size: 14px;
+    }
+
+    /* ── Progress Dots ── */
+    .progress-dots {
+      display: flex;
+      justify-content: center;
+      gap: 5px;
+      padding: 0 8px;
+    }
+    .progress-dots .dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: background 0.35s ease;
+    }
+    .progress-dots .dot.done { background: var(--accent); }
+    .progress-dots .dot.current { background: var(--primary); }
+
+    /* ── Swipe hint ── */
+    .swipe-hint {
+      font-size: 10px;
+      color: #C4BFB4;
+      text-align: center;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Picker Overlay ── */
     .picker-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 200;
+      position: fixed; inset: 0; background: rgba(44, 36, 22, 0.25);
+      z-index: 200;
       display: flex; align-items: flex-start; justify-content: center;
       opacity: 0; pointer-events: none; transition: opacity 0.2s;
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
     }
     .picker-overlay.show { opacity: 1; pointer-events: auto; }
     .picker-sheet {
-      margin-top: 100px;
+      margin-top: 90px;
       background: var(--surface);
-      border-radius: 20px;
+      border-radius: 8px;
       padding: 20px;
-      width: 260px;
+      width: 240px;
       display: flex;
       flex-wrap: wrap;
       gap: 8px;
-      box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+      border: 1px solid var(--border);
     }
     .picker-sheet button {
-      padding: 8px 14px; border-radius: 20px;
-      border: 1px solid var(--stroke); background: var(--surface);
-      font-size: 14px; color: var(--secondary); cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
+      padding: 7px 14px; border-radius: 4px;
+      border: 1px solid var(--border); background: var(--surface);
+      font-size: 13px; color: var(--secondary); cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
     }
-    .picker-sheet button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .picker-sheet button:hover { border-color: var(--accent); color: var(--primary); }
+    .picker-sheet button.on { background: var(--primary); color: var(--surface); border-color: var(--primary); }
+
+    @media (max-width: 400px) {
+      .card-quote { padding: 24px 20px 8px; }
+      .card-quote .quote-text { font-size: 18px; }
+      .card-section { padding: 8px 20px; }
+      .card-breakdown { margin: 4px 20px; padding: 10px 14px; }
+      .card-reflect { padding: 6px 20px 20px; }
+    }
   </style>
 </head>
 <body>
@@ -158,7 +270,7 @@
 <div class="app">
   <div class="app-header">
     <div class="app-title">第一性原理</div>
-    <div class="app-stats"><span class="card-pos" id="card-pos">1/10</span></div>
+    <div class="app-stats" id="card-pos">1 / 10</div>
   </div>
 
   <div class="card-stack" id="stack">
@@ -166,10 +278,8 @@
     <div class="card" id="active-card"></div>
   </div>
 
-  <div class="swipe-hint">
-    <div class="progress-bar"><div class="fill" id="progress-fill"></div></div>
-    <div class="swipe-labels">左滑下一张 &middot; 右滑上一张 &middot;  键翻卡</div>
-  </div>
+  <div class="progress-dots" id="progress-dots"></div>
+  <div class="swipe-hint">左滑下一张 &middot; 右滑上一张 &middot;  键翻卡</div>
 </div>
 
 <div class="picker-overlay" id="picker-overlay">
@@ -413,14 +523,13 @@ var dragLocked = false;
 var stack = document.getElementById("stack");
 var activeCard = document.getElementById("active-card");
 var peekCard = document.getElementById("peek-card");
-var progressFill = document.getElementById("progress-fill");
+var progressDots = document.getElementById("progress-dots");
 var cardPos = document.getElementById("card-pos");
 var pickerOverlay = document.getElementById("picker-overlay");
 var pickerSheet = document.getElementById("picker-sheet");
 
 function buildDeck() {
   var pool = activeFilter === "all" ? ALL_CARDS : ALL_CARDS.filter(function(c) { return c.catKey === activeFilter; });
-  // Shuffle
   var arr = pool.slice();
   for (var i = arr.length - 1; i > 0; i--) {
     var j = Math.floor(Math.random() * (i + 1));
@@ -440,6 +549,7 @@ function resetSession() {
 
 function renderCard(el, card) {
   if (!card) { el.innerHTML = ""; return; }
+
   var bdHtml = card.breakdown.map(function(s, i) {
     return '<div class="bd-step">' + (i+1) + '. ' + s + '</div>';
   }).join("");
@@ -451,29 +561,25 @@ function renderCard(el, card) {
 
   el.innerHTML =
     '<div class="card-quote">' +
+      '<div class="quote-mark">&ldquo;</div>' +
       '<div class="quote-text">' + card.principle + '</div>' +
-      '<div class="quote-author">' + card.author + '</div>' +
+      '<div class="quote-author">&mdash; ' + card.author + '</div>' +
     '</div>' +
-    '<div class="card-breakdown">' +
-      '<div class="bd-label"> 第一性拆解</div>' +
-      '<div class="bd-steps">' + bdHtml + '</div>' +
+    '<div class="card-divider"></div>' +
+    '<div class="card-breakdown">' + bdHtml + '</div>' +
+    '<div class="card-section">' +
+      '<div class="sec-label">案例</div>' +
+      '<div class="sec-body">' + card.caseStudy + '</div>' +
     '</div>' +
-    '<div class="card-case">' +
-      '<div class="case-label"> 案例</div>' +
-      '<div class="case-text">' + card.caseStudy + '</div>' +
-    '</div>' +
-    '<div class="card-reflect">' +
-      '<div class="refl-label"> 反思</div>' +
-      promptsHtml +
-    '</div>';
+    '<div class="card-reflect">' + promptsHtml + '</div>';
 }
 
 function updateUI() {
   if (cards.length === 0) {
-    activeCard.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--secondary);font-size:18px;">没有符合条件的卡片</div>';
+    activeCard.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--secondary);font-size:16px;">没有符合条件的卡片</div>';
     peekCard.innerHTML = "";
-    progressFill.style.width = "0%";
-    cardPos.textContent = "0/0";
+    progressDots.innerHTML = "";
+    cardPos.textContent = "0 / 0";
     return;
   }
   renderCard(activeCard, cards[currentIndex]);
@@ -484,9 +590,16 @@ function updateUI() {
   } else {
     peekCard.style.display = "none";
   }
-  progressFill.style.width = ((currentIndex + 1) / cards.length * 100) + "%";
-  cardPos.textContent = (currentIndex + 1) + "/" + cards.length;
+  cardPos.textContent = (currentIndex + 1) + " / " + cards.length;
   activeCard.style.transform = "translate(" + dragOffset.x + "px, " + dragOffset.y + "px) rotate(" + (dragOffset.x / 24) + "deg)";
+
+  // Progress dots
+  var dotsHtml = "";
+  for (var i = 0; i < cards.length; i++) {
+    var cls = i < currentIndex ? "done" : (i === currentIndex ? "current" : "");
+    dotsHtml += '<span class="dot ' + cls + '"></span>';
+  }
+  progressDots.innerHTML = dotsHtml;
 }
 
 function renderChips() {
@@ -604,7 +717,7 @@ function animatePageTurn(toIndex, exitX, exitY, goingForward) {
 
   dragOffset.x = exitX;
   dragOffset.y = exitY;
-  activeCard.style.transition = "transform 0.22s ease-out";
+  activeCard.style.transition = "transform 0.25s ease-out";
   activeCard.style.transform = "translate(" + exitX + "px, " + exitY + "px) rotate(" + (exitX / 24) + "deg)";
 
   setTimeout(function() {
@@ -622,17 +735,23 @@ function animatePageTurn(toIndex, exitX, exitY, goingForward) {
       renderCard(activeCard, cards[currentIndex]);
       dragOffset.x = 0;
       dragOffset.y = 0;
-      activeCard.style.transition = "transform 0.42s cubic-bezier(0.25, 0.1, 0.1, 1)";
+      activeCard.style.transition = "transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)";
       activeCard.style.transform = "translate(0, 0) rotate(0deg)";
-      progressFill.style.width = ((currentIndex + 1) / cards.length * 100) + "%";
-      cardPos.textContent = (currentIndex + 1) + "/" + cards.length;
+      cardPos.textContent = (currentIndex + 1) + " / " + cards.length;
+      // Update dots
+      var dotsHtml = "";
+      for (var i = 0; i < cards.length; i++) {
+        var cls = i < currentIndex ? "done" : (i === currentIndex ? "current" : "");
+        dotsHtml += '<span class="dot ' + cls + '"></span>';
+      }
+      progressDots.innerHTML = dotsHtml;
     });
 
     setTimeout(function() {
       isTransitioning = false;
       updateUI();
-    }, 450);
-  }, 230);
+    }, 520);
+  }, 260);
 }
 
 // ── Keyboard ──
