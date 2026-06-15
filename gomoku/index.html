@@ -403,95 +403,129 @@ function scoreCell(r, c, stone) {
   return total;
 }
 
+// ── Difficulty Config ──
+// Each level tunes: defense threat threshold, gap vision, attack range,
+// whether to use full pattern scoring, and aggression balance.
+// Level key: [defThreat, defGapVision, atkRange, atkFullPattern, aggression]
+//   defThreat: 4=see 4-in-row, 3=see open-3, 2=see open-2
+//   defGapVision: 0=consecutive only, 1=skip empty, 2=skip 1 white, 3=skip 2 white
+//   atkRange: 1..5 (max cells to scan in each direction)
+//   atkFullPattern: false=simple stone count, true=full open-end scoring
+//   aggression: <1 defense-heavy, 1=balanced, >1 attack-heavy
+function getDifficultyConfig(lvl) {
+  if (lvl <= 1)  return { defThreat: 4, defGap: 0, atkRange: 1, atkFull: false, aggression: 0.5 };
+  if (lvl === 2) return { defThreat: 4, defGap: 1, atkRange: 1, atkFull: false, aggression: 0.5 };
+  if (lvl === 3) return { defThreat: 4, defGap: 2, atkRange: 2, atkFull: false, aggression: 0.6 };
+  if (lvl === 4) return { defThreat: 4, defGap: 2, atkRange: 2, atkFull: false, aggression: 0.7 };
+  if (lvl === 5) return { defThreat: 3, defGap: 1, atkRange: 2, atkFull: false, aggression: 0.7 };
+  if (lvl === 6) return { defThreat: 3, defGap: 2, atkRange: 3, atkFull: false, aggression: 0.8 };
+  if (lvl === 7) return { defThreat: 3, defGap: 2, atkRange: 3, atkFull: false, aggression: 0.9 };
+  if (lvl === 8) return { defThreat: 3, defGap: 3, atkRange: 4, atkFull: false, aggression: 1.0 };
+  if (lvl === 9) return { defThreat: 2, defGap: 1, atkRange: 5, atkFull: true,  aggression: 1.0 };
+  if (lvl === 10)return { defThreat: 2, defGap: 2, atkRange: 5, atkFull: true,  aggression: 1.1 };
+  if (lvl === 11)return { defThreat: 2, defGap: 2, atkRange: 5, atkFull: true,  aggression: 1.2 };
+  if (lvl === 12)return { defThreat: 2, defGap: 3, atkRange: 5, atkFull: true,  aggression: 1.3 };
+  if (lvl === 13)return { defThreat: 1, defGap: 3, atkRange: 5, atkFull: true,  aggression: 1.4 };
+  if (lvl === 14)return { defThreat: 1, defGap: 3, atkRange: 5, atkFull: true,  aggression: 1.5 };
+  return           { defThreat: 0, defGap: 4, atkRange: 5, atkFull: true,  aggression: 2.0 };
+}
+
 function findBestMove() {
   const candidates = candidateMoves();
+  const cfg = getDifficultyConfig(difficulty);
   let bestScore = -Infinity;
   let best = {r: 7, c: 7};
 
   for (const m of candidates) {
-    let score;
-    if (difficulty === 1) {
-      score = level1Score(m.r, m.c);
-    } else if (difficulty === 2) {
-      score = level2Score(m.r, m.c);
-    } else {
-      const atk = scoreCell(m.r, m.c, STONE_WHITE);
-      const def = scoreCell(m.r, m.c, STONE_BLACK);
-      score = Math.max(atk, def) * 2 + Math.min(atk, def);
-    }
+    const def = defenseScore(m.r, m.c, cfg);
+    const atk = cfg.atkFull
+      ? scoreCell(m.r, m.c, STONE_WHITE)
+      : simpleAtkScore(m.r, m.c, cfg.atkRange);
+    const score = Math.max(atk, def) * cfg.aggression + Math.min(atk, def);
     if (score > bestScore) { bestScore = score; best = m; }
   }
   return best;
 }
 
-// Level 1 AI:
-// - Defense: only blocks player's exact 4 consecutive (stops at gaps, not 3)
-// - Attack: only sees adjacent white stones (distance 1)
-function level1Score(r, c) {
+// Defense: scan for opponent threats given current perception config
+function defenseScore(r, c, cfg) {
+  if (cfg.defThreat === 0) return scoreCell(r, c, STONE_BLACK); // full scoring
+
   let score = 0;
   const dirs = [[0,1],[1,0],[1,1],[1,-1]];
 
+  // Scan outward from (r,c), counting black stones. Behavior depends on gap vision:
+  //   gap=0: stop at first non-black (consecutive only)
+  //   gap=1: skip empty cells, stop at white or edge
+  //   gap=2: skip empty + up to 1 white stone
+  //   gap=3: skip empty + up to 2 white stones
+  //   gap=4: skip empty + any white (count all black in range)
+
   for (const [dr, dc] of dirs) {
-    let cnt = 1;
-    for (let i = 1; i <= 4; i++) {
-      const nr = r + dr * i, nc = c + dc * i;
-      if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === STONE_BLACK) cnt++;
-      else break;
+    let cnt = 1; // (r,c) as black
+    cnt += scanDirection(r, c, dr, dc, 1, cfg);
+    cnt += scanDirection(r, c, dr, dc, -1, cfg);
+
+    // Score based on count: if we have enough stones to potentially reach 5
+    // with existing stones + our placement, score it
+    if (cnt >= 5) {
+      // Immediate block: 4 existing + our 1 = 5
+      score += 100000;
+    } else if (cnt >= cfg.defThreat + 1) {
+      // Emerging threat at AI's perception level
+      const gap = 5 - cnt;
+      score += Math.pow(10, 5 - cfg.defThreat) * (5 - gap);
     }
-    for (let i = 1; i <= 4; i++) {
-      const nr = r - dr * i, nc = c - dc * i;
-      if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === STONE_BLACK) cnt++;
-      else break;
-    }
-    if (cnt >= 5) score += 100000;
   }
 
-  let neighbors = 0;
-  for (let dr = -1; dr <= 1; dr++)
-    for (let dc = -1; dc <= 1; dc++) {
-      if (dr === 0 && dc === 0) continue;
-      const nr = r + dr, nc = c + dc;
-      if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === STONE_WHITE) neighbors++;
-    }
-  score += neighbors * 10;
-  score += Math.max(0, 14 - (Math.abs(r - 7) + Math.abs(c - 7)));
   return score;
 }
 
-// Level 2 AI:
-// - Defense: sees any 4 black stones within range, including gapped (counts through gaps, stops at white)
-// - Attack: same as level 1 — only adjacent white stones (distance 1)
-function level2Score(r, c) {
+function scanDirection(r, c, dr, dc, sign, cfg) {
+  let cnt = 0;
+  let whiteSkip = 0;
+  const maxSkip = cfg.defGap <= 1 ? 0 : cfg.defGap - 1;
+
+  for (let i = 1; i <= 4; i++) {
+    const nr = r + sign * dr * i;
+    const nc = c + sign * dc * i;
+    if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) break;
+
+    if (board[nr][nc] === STONE_BLACK) {
+      cnt++;
+    } else if (board[nr][nc] === STONE_WHITE) {
+      if (cfg.defGap >= 2 && whiteSkip < maxSkip) { whiteSkip++; continue; }
+      break;
+    } else {
+      // Empty cell
+      if (cfg.defGap >= 1) continue; // skip gaps
+      break; // gap=0: stop at empty
+    }
+  }
+  return cnt;
+}
+
+// Simple attack: count white stones within range (no open-end analysis)
+function simpleAtkScore(r, c, range) {
   let score = 0;
   const dirs = [[0,1],[1,0],[1,1],[1,-1]];
 
   for (const [dr, dc] of dirs) {
     let cnt = 1;
-    // Scan forward — count black stones, pass through gaps, stop at white or edge
-    for (let i = 1; i <= 4; i++) {
+    for (let i = 1; i <= range; i++) {
       const nr = r + dr * i, nc = c + dc * i;
-      if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) break;
-      if (board[nr][nc] === STONE_BLACK) cnt++;
-      else if (board[nr][nc] === STONE_WHITE) break; // white blocks the line
-      // empty: continue looking (can see through gaps)
+      if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === STONE_WHITE) cnt++;
+      else break;
     }
-    for (let i = 1; i <= 4; i++) {
+    for (let i = 1; i <= range; i++) {
       const nr = r - dr * i, nc = c - dc * i;
-      if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) break;
-      if (board[nr][nc] === STONE_BLACK) cnt++;
-      else if (board[nr][nc] === STONE_WHITE) break;
+      if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === STONE_WHITE) cnt++;
+      else break;
     }
-    if (cnt >= 5) score += 100000;
+    score += cnt * cnt * 10;
   }
 
-  let neighbors = 0;
-  for (let dr = -1; dr <= 1; dr++)
-    for (let dc = -1; dc <= 1; dc++) {
-      if (dr === 0 && dc === 0) continue;
-      const nr = r + dr, nc = c + dc;
-      if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === STONE_WHITE) neighbors++;
-    }
-  score += neighbors * 10;
+  // Center bonus
   score += Math.max(0, 14 - (Math.abs(r - 7) + Math.abs(c - 7)));
   return score;
 }
