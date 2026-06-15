@@ -72,6 +72,20 @@
     .controls button:hover { background: var(--accent); color: #fff; }
     .controls button.primary { background: var(--accent); color: #fff; }
     .controls button.primary:hover { opacity: 0.85; }
+    .lvl-btn {
+      width: 28px; height: 28px;
+      border-radius: 14px;
+      border: 1px solid var(--accent);
+      background: transparent;
+      color: var(--accent);
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+      padding: 0;
+    }
+    .lvl-btn:hover { opacity: 0.7; }
+    .lvl-btn.on { background: var(--accent); color: #fff; }
 </style>
 </head>
 <body>
@@ -81,6 +95,19 @@
   <canvas id="board"></canvas>
   <div class="controls">
     <button id="btn-new" class="primary">新局</button>
+  </div>
+  <div class="difficulty" style="display:flex;gap:4px;flex-wrap:wrap;justify-content:center;max-width:360px">
+    <span style="font-size:12px;color:var(--muted);line-height:28px;margin-right:4px">难度</span>
+    <button class="lvl-btn" data-lvl="1" style="background:var(--accent);color:#fff">1</button>
+    <button class="lvl-btn" data-lvl="2">2</button>
+    <button class="lvl-btn" data-lvl="3">3</button>
+    <button class="lvl-btn" data-lvl="4">4</button>
+    <button class="lvl-btn" data-lvl="5">5</button>
+    <button class="lvl-btn" data-lvl="6">6</button>
+    <button class="lvl-btn" data-lvl="7">7</button>
+    <button class="lvl-btn" data-lvl="8">8</button>
+    <button class="lvl-btn" data-lvl="9">9</button>
+    <button class="lvl-btn" data-lvl="10">10</button>
   </div>
 </div>
 
@@ -99,6 +126,7 @@ let winningCells = new Set();
 let lastMove = null;
 let vsAI = true;
 let aiThinking = false;
+let difficulty = 1;  // 1-10, default level 1
 
 // ── Canvas & sizing ──
 const canvas = document.getElementById('board');
@@ -381,9 +409,16 @@ function findBestMove() {
   let best = {r: 7, c: 7};
 
   for (const m of candidates) {
-    const atk = scoreCell(m.r, m.c, STONE_WHITE);
-    const def = scoreCell(m.r, m.c, STONE_BLACK);
-    const score = Math.max(atk, def) * 2 + Math.min(atk, def);
+    let score;
+    if (difficulty === 1) {
+      // Level 1: only look at own stones, pure attack, ignore opponent
+      score = scoreCell(m.r, m.c, STONE_WHITE);
+    } else {
+      // Higher levels (placeholder for now)
+      const atk = scoreCell(m.r, m.c, STONE_WHITE);
+      const def = scoreCell(m.r, m.c, STONE_BLACK);
+      score = Math.max(atk, def) * 2 + Math.min(atk, def);
+    }
     if (score > bestScore) { bestScore = score; best = m; }
   }
   return best;
@@ -419,6 +454,16 @@ canvas.addEventListener('touchstart', e => {
 // ── Controls ──
 
 document.getElementById('btn-new').addEventListener('click', initGame);
+
+// ── Difficulty selector ──
+document.querySelectorAll('.lvl-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    difficulty = parseInt(btn.dataset.lvl);
+    document.querySelectorAll('.lvl-btn').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    initGame();
+  });
+});
 
 </script>
 </body>
