@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>五子棋</title>
+  <style>
+    :root {
+      --bg: #E8DCC8;
+      --text: #3C3024;
+      --muted: #8C7A60;
+      --accent: #A08060;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html {
+      font: 16px/1.6 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      touch-action: manipulation;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100dvh;
+      padding: 12px;
+    }
+    .app {
+      width: 100%;
+      max-width: 480px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: 0.04em;
+    }
+    .status {
+      font-size: 14px;
+      color: var(--muted);
+      min-height: 24px;
+      text-align: center;
+    }
+    .status .player { font-weight: 600; color: var(--text); }
+    canvas {
+      display: block;
+      border-radius: 6px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.10), 0 8px 24px rgba(0,0,0,0.12);
+      cursor: pointer;
+      max-width: 100%;
+    }
+    .controls {
+      display: flex;
+      gap: 16px;
+    }
+    .controls button {
+      padding: 8px 18px;
+      border-radius: 20px;
+      border: 1px solid var(--accent);
+      background: transparent;
+      color: var(--accent);
+      font-size: 14px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.15s;
+    }
+    .controls button:hover { background: var(--accent); color: #fff; }
+    .controls button.primary { background: var(--accent); color: #fff; }
+    .controls button.primary:hover { opacity: 0.85; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>五子棋</h1>
+  <div class="status" id="status"><span class="player">⚫ 黑棋</span> 落子</div>
+  <canvas id="board"></canvas>
+  <div class="controls">
+    <button id="btn-new" class="primary">新局</button>
+    <button id="btn-mode">双人对战</button>
+  </div>
+</div>
+
+<script>
+// ── Constants ──
+const SIZE = 15;
+const WIN_COUNT = 5;
+const STONE_BLACK = 1;
+const STONE_WHITE = 2;
+
+// ── State ──
+let board = [];
+let currentPlayer = STONE_BLACK;
+let winner = 0;
+let winningCells = new Set();
+let lastMove = null;
+let vsAI = true;
+let aiThinking = false;
+
+// ── Canvas & sizing ──
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status');
+
+let cellSize, padding, boardSize;
+
+function calcSize() {
+  const maxWidth = Math.min(window.innerWidth - 24, 460);
+  const maxHeight = window.innerHeight - 240;
+  const available = Math.min(maxWidth, maxHeight);
+  cellSize = Math.floor(available / (SIZE + 1));
+  padding = cellSize;
+  boardSize = padding * 2 + cellSize * (SIZE - 1);
+  canvas.width = boardSize;
+  canvas.height = boardSize;
+  canvas.style.width = boardSize + 'px';
+  canvas.style.height = boardSize + 'px';
+}
+
+function initGame() {
+  board = Array.from({length: SIZE}, () => Array(SIZE).fill(0));
+  currentPlayer = STONE_BLACK;
+  winner = 0;
+  winningCells = new Set();
+  lastMove = null;
+  aiThinking = false;
+  updateStatus();
+  draw();
+}
+
+calcSize();
+initGame();
+
+window.addEventListener('resize', () => { calcSize(); draw(); });
+
+// ── Drawing ──
+
+function draw() {
+  ctx.clearRect(0, 0, boardSize, boardSize);
+
+  // Board background — warm wood
+  const woodGrad = ctx.createLinearGradient(0, 0, boardSize, boardSize);
+  woodGrad.addColorStop(0, '#DEB887');
+  woodGrad.addColorStop(0.3, '#D4A76A');
+  woodGrad.addColorStop(0.6, '#D9B382');
+  woodGrad.addColorStop(1, '#C9A06C');
+  ctx.fillStyle = woodGrad;
+  ctx.beginPath();
+  roundRect(ctx, 0, 0, boardSize, boardSize, 6);
+  ctx.fill();
+
+  // Subtle wood grain lines
+  ctx.save();
+  ctx.beginPath();
+  roundRect(ctx, 0, 0, boardSize, boardSize, 6);
+  ctx.clip();
+  for (let i = 0; i < 20; i++) {
+    const y = Math.random() * boardSize;
+    ctx.strokeStyle = 'rgba(139,100,60,' + (Math.random() * 0.06) + ')';
+    ctx.lineWidth = Math.random() * 2 + 0.5;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.bezierCurveTo(boardSize * 0.3, y + Math.random() * 20 - 10, boardSize * 0.7, y + Math.random() * 20 - 10, boardSize, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i < SIZE; i++) {
+    const pos = padding + i * cellSize;
+    ctx.beginPath();
+    ctx.moveTo(padding, pos);
+    ctx.lineTo(padding + (SIZE - 1) * cellSize, pos);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(pos, padding);
+    ctx.lineTo(pos, padding + (SIZE - 1) * cellSize);
+    ctx.stroke();
+  }
+
+  // Star points
+  const stars = [[3,3],[3,7],[3,11],[7,3],[7,7],[7,11],[11,3],[11,7],[11,11]];
+  for (const [r, c] of stars) {
+    const x = padding + c * cellSize;
+    const y = padding + r * cellSize;
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.beginPath();
+    ctx.arc(x, y, cellSize * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Stones
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (board[r][c] === 0) continue;
+      const x = padding + c * cellSize;
+      const y = padding + r * cellSize;
+      const rStone = cellSize * 0.44;
+      const isWin = winningCells.has(r + ',' + c);
+      const isLast = lastMove && lastMove.r === r && lastMove.c === c;
+
+      // Shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.beginPath();
+      ctx.arc(x + 1, y + 1.5, rStone, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Body gradient
+      const grad = ctx.createRadialGradient(x - rStone * 0.3, y - rStone * 0.3, rStone * 0.1, x, y, rStone);
+      if (board[r][c] === STONE_BLACK) {
+        grad.addColorStop(0, '#555');
+        grad.addColorStop(1, '#111');
+      } else {
+        grad.addColorStop(0, '#fff');
+        grad.addColorStop(1, '#c8c8c8');
+      }
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(x, y, rStone, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Win highlight
+      if (isWin) {
+        ctx.strokeStyle = '#d44';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(x, y, rStone + 2, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Last move dot
+      if (isLast && winner === 0) {
+        ctx.fillStyle = board[r][c] === STONE_BLACK ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.5)';
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+}
+
+// ── Game Logic ──
+
+function placeStone(r, c) {
+  if (winner !== 0 || board[r][c] !== 0 || aiThinking) return false;
+  board[r][c] = currentPlayer;
+  lastMove = {r, c};
+
+  if (checkWin(r, c)) {
+    winner = currentPlayer;
+  } else if (isBoardFull()) {
+    winner = -1; // draw
+  } else {
+    currentPlayer = currentPlayer === STONE_BLACK ? STONE_WHITE : STONE_BLACK;
+  }
+
+  draw();
+  updateStatus();
+
+  if (winner === 0 && vsAI && currentPlayer === STONE_WHITE) {
+    aiThinking = true;
+    updateStatus();
+    setTimeout(() => {
+      const move = findBestMove();
+      aiThinking = false;
+      placeStone(move.r, move.c);
+    }, 250);
+  }
+
+  return true;
+}
+
+function checkWin(r, c) {
+  const stone = board[r][c];
+  const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+  for (const [dr, dc] of dirs) {
+    const cells = [[r, c]];
+    for (let i = 1; i < WIN_COUNT; i++) {
+      const nr = r + dr * i, nc = c + dc * i;
+      if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === stone) cells.push([nr, nc]);
+      else break;
+    }
+    for (let i = 1; i < WIN_COUNT; i++) {
+      const nr = r - dr * i, nc = c - dc * i;
+      if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === stone) cells.push([nr, nc]);
+      else break;
+    }
+    if (cells.length >= WIN_COUNT) {
+      winningCells = new Set(cells.map(c => c[0] + ',' + c[1]));
+      return true;
+    }
+  }
+  return false;
+}
+
+function isBoardFull() {
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++)
+      if (board[r][c] === 0) return false;
+  return true;
+}
+
+function updateStatus() {
+  if (winner === STONE_BLACK) statusEl.innerHTML = '<span class="player">⚫ 黑棋</span> 获胜！';
+  else if (winner === STONE_WHITE) statusEl.innerHTML = '<span class="player">⚪ 白棋</span> 获胜！';
+  else if (winner === -1) statusEl.innerHTML = '平局';
+  else if (aiThinking) statusEl.innerHTML = '🤔 AI 思考中…';
+  else statusEl.innerHTML = '<span class="player">' + (currentPlayer === STONE_BLACK ? '⚫ 黑棋' : '⚪ 白棋') + '</span> 落子';
+}
+
+// ── AI ──
+
+function candidateMoves() {
+  if (!lastMove) return [{r: 7, c: 7}];
+  const set = new Set();
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (board[r][c] !== 0) continue;
+      for (let dr = -2; dr <= 2; dr++) {
+        for (let dc = -2; dc <= 2; dc++) {
+          const nr = r + dr, nc = c + dc;
+          if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] !== 0) {
+            set.add(r + ',' + c);
+          }
+        }
+      }
+    }
+  }
+  if (set.size === 0) return [{r: 7, c: 7}];
+  return [...set].map(s => { const [r, c] = s.split(','); return {r: +r, c: +c}; });
+}
+
+function scoreCell(r, c, stone) {
+  board[r][c] = stone;
+  let total = 0;
+  const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+  for (const [dr, dc] of dirs) {
+    let cnt = 1, open = 0;
+    for (let i = 1; i <= 5; i++) {
+      const nr = r + dr * i, nc = c + dc * i;
+      if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === stone) cnt++;
+      else { if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === 0) open++; break; }
+    }
+    for (let i = 1; i <= 5; i++) {
+      const nr = r - dr * i, nc = c - dc * i;
+      if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === stone) cnt++;
+      else { if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === 0) open++; break; }
+    }
+    if (cnt >= 5) total += 100000;
+    else if (open === 0) total += 0;
+    else if (cnt === 4) total += (open === 2 ? 50000 : 5000);
+    else if (cnt === 3) total += (open === 2 ? 3000 : 300);
+    else if (cnt === 2) total += (open === 2 ? 200 : 20);
+    else if (cnt === 1) total += (open === 2 ? 10 : 1);
+  }
+  board[r][c] = 0;
+  return total;
+}
+
+function findBestMove() {
+  const candidates = candidateMoves();
+  let bestScore = -Infinity;
+  let best = {r: 7, c: 7};
+
+  for (const m of candidates) {
+    const atk = scoreCell(m.r, m.c, STONE_WHITE);
+    const def = scoreCell(m.r, m.c, STONE_BLACK);
+    const score = Math.max(atk, def) * 2 + Math.min(atk, def);
+    if (score > bestScore) { bestScore = score; best = m; }
+  }
+  return best;
+}
+
+// ── Input ──
+
+function getBoardPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = boardSize / rect.width;
+  const scaleY = boardSize / rect.height;
+  const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+  const x = (clientX - rect.left) * scaleX - padding;
+  const y = (clientY - rect.top) * scaleY - padding;
+  const c = Math.round(x / cellSize);
+  const r = Math.round(y / cellSize);
+  if (r >= 0 && r < SIZE && c >= 0 && c < SIZE) return {r, c};
+  return null;
+}
+
+canvas.addEventListener('click', e => {
+  const pos = getBoardPos(e);
+  if (pos) placeStone(pos.r, pos.c);
+});
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  const pos = getBoardPos(e);
+  if (pos) placeStone(pos.r, pos.c);
+}, {passive: false});
+
+// ── Controls ──
+
+document.getElementById('btn-new').addEventListener('click', initGame);
+
+const modeBtn = document.getElementById('btn-mode');
+modeBtn.addEventListener('click', () => {
+  vsAI = !vsAI;
+  modeBtn.textContent = vsAI ? '双人对战' : '人机对战';
+  initGame();
+});
+</script>
+</body>
+</html>

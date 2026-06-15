@@ -11,6 +11,7 @@ liucxer.github.io/                 → Portfolio homepage (this README's repo ro
 ├── claude-desk/                   → /claude-desk/        (macOS · English)
 ├── learning-flashcards/           → /learning-flashcards/ (iOS · 中文)
 ├── dingding-logic/                → /dingding-logic/      (iOS · 中文)
+├── gomoku/                        → /gomoku/             (web · 中文游戏)
 ├── first-principles/              → /first-principles/   (web · 中文原型)
 ├── preowned-islands/              → /preowned-islands/    (iOS · 中文)
 ├── preowned-islands-intl/         → /preowned-islands-intl/ (iOS · English)
@@ -31,6 +32,7 @@ Each app is a **self-contained subdirectory** — its own pages, its own `style.
 | **claude-desk** | https://liucxer.github.io/claude-desk/ | macOS · English | Early development |
 | **小豆丁学堂** | https://liucxer.github.io/learning-flashcards/ | iOS · 中文 | 免费 · [App Store](https://apps.apple.com/cn/app/小豆丁学堂/id6762811519) |
 | **小豆丁逻辑课** | https://liucxer.github.io/dingding-logic/ | iOS · 中文 | 免费 · [App Store](https://apps.apple.com/cn/app/小豆丁-逻辑课/id6775833119) |
+| **五子棋** | https://liucxer.github.io/gomoku/ | web · 中文 | 在线游戏 |
 | **第一性原理** | https://liucxer.github.io/first-principles/ | web · 中文 | 产品原型 |
 | **二手海岛** | https://liucxer.github.io/preowned-islands/ | iOS · 中文 | ¥18 · App Store(审核中) |
 | **PreOwned Islands** | https://liucxer.github.io/preowned-islands-intl/ | iOS · English | $2.99 · App Store (coming soon) |
