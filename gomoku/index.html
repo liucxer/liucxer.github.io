@@ -277,11 +277,12 @@ function placeStone(r, c) {
   if (winner === 0 && vsAI && currentPlayer === STONE_WHITE) {
     aiThinking = true;
     updateStatus();
+    const delay = 3000 + Math.random() * 2000; // 3-5 seconds
     setTimeout(() => {
       const move = findBestMove();
       aiThinking = false;
       placeStone(move.r, move.c);
-    }, 250);
+    }, delay);
   }
 
   return true;
