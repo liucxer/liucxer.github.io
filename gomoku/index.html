@@ -411,10 +411,8 @@ function findBestMove() {
   for (const m of candidates) {
     let score;
     if (difficulty === 1) {
-      // Level 1: only look at own stones, pure attack, ignore opponent
-      score = scoreCell(m.r, m.c, STONE_WHITE);
+      score = level1Score(m.r, m.c);
     } else {
-      // Higher levels (placeholder for now)
       const atk = scoreCell(m.r, m.c, STONE_WHITE);
       const def = scoreCell(m.r, m.c, STONE_BLACK);
       score = Math.max(atk, def) * 2 + Math.min(atk, def);
@@ -422,6 +420,49 @@ function findBestMove() {
     if (score > bestScore) { bestScore = score; best = m; }
   }
   return best;
+}
+
+// Level 1 AI:
+// - Defense: only blocks player's exact 4 consecutive (not gapped, not 3)
+// - Attack: only sees adjacent white stones (distance 1), can't see longer patterns
+function level1Score(r, c) {
+  let score = 0;
+  const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+
+  // ── Defense: detect player's 4 consecutive that we must block ──
+  for (const [dr, dc] of dirs) {
+    let cnt = 1; // pretend this cell is black
+    for (let i = 1; i <= 4; i++) {
+      const nr = r + dr * i, nc = c + dc * i;
+      if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === STONE_BLACK) cnt++;
+      else break; // gap or edge → stop, AI can't see through gaps
+    }
+    for (let i = 1; i <= 4; i++) {
+      const nr = r - dr * i, nc = c - dc * i;
+      if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === STONE_BLACK) cnt++;
+      else break;
+    }
+    if (cnt >= 5) score += 100000; // must block 4-in-a-row
+  }
+
+  // ── Attack: count white stones in 8 neighboring cells (distance 1) ──
+  let neighbors = 0;
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const nr = r + dr, nc = c + dc;
+      if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === STONE_WHITE) {
+        neighbors++;
+      }
+    }
+  }
+  score += neighbors * 10;
+
+  // Small bonus for center proximity (helps first move)
+  const distToCenter = Math.abs(r - 7) + Math.abs(c - 7);
+  score += Math.max(0, 14 - distToCenter);
+
+  return score;
 }
 
 // ── Input ──
