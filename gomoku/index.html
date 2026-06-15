@@ -81,7 +81,6 @@
   <canvas id="board"></canvas>
   <div class="controls">
     <button id="btn-new" class="primary">新局</button>
-    <button id="btn-mode">双人对战</button>
   </div>
 </div>
 
@@ -420,12 +419,6 @@ canvas.addEventListener('touchstart', e => {
 
 document.getElementById('btn-new').addEventListener('click', initGame);
 
-const modeBtn = document.getElementById('btn-mode');
-modeBtn.addEventListener('click', () => {
-  vsAI = !vsAI;
-  modeBtn.textContent = vsAI ? '双人对战' : '人机对战';
-  initGame();
-});
 </script>
 </body>
 </html>
