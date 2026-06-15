@@ -412,6 +412,8 @@ function findBestMove() {
     let score;
     if (difficulty === 1) {
       score = level1Score(m.r, m.c);
+    } else if (difficulty === 2) {
+      score = level2Score(m.r, m.c);
     } else {
       const atk = scoreCell(m.r, m.c, STONE_WHITE);
       const def = scoreCell(m.r, m.c, STONE_BLACK);
@@ -423,45 +425,74 @@ function findBestMove() {
 }
 
 // Level 1 AI:
-// - Defense: only blocks player's exact 4 consecutive (not gapped, not 3)
-// - Attack: only sees adjacent white stones (distance 1), can't see longer patterns
+// - Defense: only blocks player's exact 4 consecutive (stops at gaps, not 3)
+// - Attack: only sees adjacent white stones (distance 1)
 function level1Score(r, c) {
   let score = 0;
   const dirs = [[0,1],[1,0],[1,1],[1,-1]];
 
-  // ── Defense: detect player's 4 consecutive that we must block ──
   for (const [dr, dc] of dirs) {
-    let cnt = 1; // pretend this cell is black
+    let cnt = 1;
     for (let i = 1; i <= 4; i++) {
       const nr = r + dr * i, nc = c + dc * i;
       if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === STONE_BLACK) cnt++;
-      else break; // gap or edge → stop, AI can't see through gaps
+      else break;
     }
     for (let i = 1; i <= 4; i++) {
       const nr = r - dr * i, nc = c - dc * i;
       if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === STONE_BLACK) cnt++;
       else break;
     }
-    if (cnt >= 5) score += 100000; // must block 4-in-a-row
+    if (cnt >= 5) score += 100000;
   }
 
-  // ── Attack: count white stones in 8 neighboring cells (distance 1) ──
   let neighbors = 0;
-  for (let dr = -1; dr <= 1; dr++) {
+  for (let dr = -1; dr <= 1; dr++)
     for (let dc = -1; dc <= 1; dc++) {
       if (dr === 0 && dc === 0) continue;
       const nr = r + dr, nc = c + dc;
-      if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === STONE_WHITE) {
-        neighbors++;
-      }
+      if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === STONE_WHITE) neighbors++;
     }
-  }
   score += neighbors * 10;
+  score += Math.max(0, 14 - (Math.abs(r - 7) + Math.abs(c - 7)));
+  return score;
+}
 
-  // Small bonus for center proximity (helps first move)
-  const distToCenter = Math.abs(r - 7) + Math.abs(c - 7);
-  score += Math.max(0, 14 - distToCenter);
+// Level 2 AI:
+// - Defense: sees any 4 black stones within range, including gapped (counts through gaps, stops at white)
+// - Attack: same as level 1 — only adjacent white stones (distance 1)
+function level2Score(r, c) {
+  let score = 0;
+  const dirs = [[0,1],[1,0],[1,1],[1,-1]];
 
+  for (const [dr, dc] of dirs) {
+    let cnt = 1;
+    // Scan forward — count black stones, pass through gaps, stop at white or edge
+    for (let i = 1; i <= 4; i++) {
+      const nr = r + dr * i, nc = c + dc * i;
+      if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) break;
+      if (board[nr][nc] === STONE_BLACK) cnt++;
+      else if (board[nr][nc] === STONE_WHITE) break; // white blocks the line
+      // empty: continue looking (can see through gaps)
+    }
+    for (let i = 1; i <= 4; i++) {
+      const nr = r - dr * i, nc = c - dc * i;
+      if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) break;
+      if (board[nr][nc] === STONE_BLACK) cnt++;
+      else if (board[nr][nc] === STONE_WHITE) break;
+    }
+    if (cnt >= 5) score += 100000;
+  }
+
+  let neighbors = 0;
+  for (let dr = -1; dr <= 1; dr++)
+    for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      const nr = r + dr, nc = c + dc;
+      if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === STONE_WHITE) neighbors++;
+    }
+  score += neighbors * 10;
+  score += Math.max(0, 14 - (Math.abs(r - 7) + Math.abs(c - 7)));
   return score;
 }
 
